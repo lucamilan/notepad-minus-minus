@@ -1,4 +1,4 @@
-name: github pages
+name: automated github pages
 
 on:
   push:
