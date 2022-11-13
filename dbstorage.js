@@ -1,8 +1,11 @@
-﻿export function createSqLiteFile(filename) {
+﻿﻿const dbName = 'SqliteStorage';
+
+export function synchronizeFileWithIndexedDb(filename) {
     return new Promise((res, rej) => {
-        const db = window.indexedDB.open("SqliteStorage", 1);
+        const db = window.indexedDB.open(dbName, 1);
         db.onupgradeneeded = () => {
             db.result.createObjectStore("Files", { keypath: "id" });
+            console.log("onupgradeneeded");
         };
 
         db.onsuccess = () => {
@@ -11,6 +14,7 @@
                 .objectStore("Files")
                 .get("file");
             req.onsuccess = () => {
+                console.log("onsuccess");
                 window.Module.FS_createDataFile(
                     "/",
                     filename,
@@ -39,4 +43,8 @@
             }
         }, 1000);
     });
+}
+
+export function deleteIndexedDb() {
+    window.indexedDB.deleteDatabase(dbName);
 }
