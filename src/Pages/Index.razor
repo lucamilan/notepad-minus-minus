@@ -2,6 +2,28 @@
 
 <PageTitle>Notepad Minus Minus - Built with Blazor WASM</PageTitle>
 
-<h1>Notepad Minus Minus</h1>
+@if(_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Size="Size.Large" Indeterminate="true" Class="my-7">
+         <MudText Typo="Typo.subtitle1" Color="Color.Dark">
+                        <b>Waiting few seconds...</b>
+        </MudText>
+    </MudProgressLinear> 
+}
+else
+{
+    <MudDynamicTabs @ref="_tabsReference" CloseTab="@((panel) => CloseTabCallback(panel))" AddTab="AddTabCallback"
+        @bind-ActivePanelIndex="_index" Elevation="3" Rounded="true" ApplyEffectsToContainer="true" PanelClass="px-4 py-6"
+        AddIconToolTip="Click here to add a new tab" CloseIconToolTip="Close this tab. All data will be lost"
+        PrevIcon="@Icons.Filled.SkipPrevious" NextIcon="@Icons.Filled.SkipNext">
 
-<p> Coming Soon! </p>
+        @foreach (var sheet in _sheets)
+        {
+            <MudTabPanel Text="@sheet.Title" Tag="@sheet.Id">
+                <MudTextField TextChanged="OnTextChangeHandler" T="string" Label="@sheet.CreatedAt.ToString()" Lines="30"
+                Variant="Variant.Outlined" @bind-Value="@sheet.Text" />
+            </MudTabPanel>
+        }
+
+    </MudDynamicTabs>
+}
