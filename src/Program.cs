@@ -17,5 +17,6 @@ builder.Services.AddDbContextFactory<NotepadDbContext>(options =>
          .LogTo(Console.WriteLine, LogLevel.Critical)
          .EnableSensitiveDataLogging());
 builder.Services.AddScoped<DataSynchronizer>();
+builder.Services.AddScoped<EventNotifier>();
 
 await builder.Build().RunAsync();

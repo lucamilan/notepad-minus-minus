@@ -12,14 +12,14 @@
 }
 else
 {
-    <MudDynamicTabs @ref="_tabsReference" CloseTab="@((panel) => CloseTabCallback(panel))" AddTab="AddTabCallback"
+    <MudDynamicTabs @ref="_tabsRef" CloseTab="@((panel) => RemoveSheetCallback(panel))" AddTab="AddSheetCallback"
         @bind-ActivePanelIndex="_index" Elevation="3" Rounded="true" ApplyEffectsToContainer="true" PanelClass="px-4 py-6"
-        AddIconToolTip="Click here to add a new tab" CloseIconToolTip="Close this tab. All data will be lost"
+        AddIconToolTip="Click here to add a new sheet" CloseIconToolTip="Remove this sheet. All data will be lost"
         PrevIcon="@Icons.Filled.SkipPrevious" NextIcon="@Icons.Filled.SkipNext">
 
         @foreach (var sheet in _sheets)
         {
-            <MudTabPanel Text="@sheet.Title" Tag="@sheet.Id">
+            <MudTabPanel Text="@sheet.Title" Tag="@sheet.Id" BadgeColor="@(sheet.IsEmpty()? Color.Surface : Color.Success)" BadgeDot="true" >
                 <MudTextField TextChanged="OnTextChangeHandler" T="string" Label="@sheet.CreatedAt.ToString()" Lines="30"
                 Variant="Variant.Outlined" @bind-Value="@sheet.Text" />
             </MudTabPanel>

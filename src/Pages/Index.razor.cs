@@ -8,9 +8,14 @@ namespace notepad.Pages
     public partial class Index
     {
         private List<Sheet> _sheets = new();
-        private MudDynamicTabs? _tabsReference = null!;
+        private MudDynamicTabs? _tabsRef = null!;
+        [Inject]
+        private IDialogService DialogService { get; set; } = null!;
         [Inject]
         private DataSynchronizer DataSynchronizer { get; set; } = null!;
+        [Inject]
+        private EventNotifier Notifier { get; set; } = null!;
+
         [Inject]
         private ILogger<Index> Log { get; set; } = null!;
         private bool _updateIndex = false;
@@ -18,52 +23,50 @@ namespace notepad.Pages
         private int _index = 0;
         protected override async Task OnInitializedAsync()
         {
+            Notifier.SaveAll += OnSaveAll;
+
             await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
 
             _sheets = await db.Sheets.ToListAsync();
 
             if (!_sheets.Any())
             {
-                var newSheet = AddNewSheet();
-                db.Sheets.Add(newSheet);
-                await db.SaveChangesAsync();
+                var sheet = CreateEmptySheet();
+                await AddSheet(sheet);
+                _sheets.Add(sheet);
                 Log.LogInformation("First sheet was added");
             }
-
-            InitializePageRequestTimer();
-
-            Log.LogInformation($"Sheets count: {_sheets.Count}");
 
             _isLoading = false;
         }
 
-        private void InitializePageRequestTimer()
+        private async Task OnSaveAll()
         {
-            int _autoSaveInterval = 1000 * 5;
-            var timer = new Timer(async (object? stateInfo) =>
-            {
-                await InvokeAsync(async () =>
-                {
-                    await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
-                    _sheets.ForEach(_ => db.Entry(_).State = EntityState.Modified);
-                    await db.SaveChangesAsync();
-                    Log.LogInformation("Autosave");
-                });
+            _isLoading = true;
 
-            }, new AutoResetEvent(false), _autoSaveInterval, _autoSaveInterval);
+            await InvokeAsync(async () =>
+            {
+                await UpdateSheets(_sheets);
+                StateHasChanged();
+                _isLoading = false;
+                Log.LogInformation("Doc globally saved");
+            });
         }
 
-        private Sheet AddNewSheet()
+        public void Dispose()
+        {
+            Notifier.SaveAll -= OnSaveAll;
+        }
+
+        private Sheet CreateEmptySheet()
         {
             var counter = _sheets.Count + 1;
 
-            var newSheet = new Sheet { Title = $"Sheet {counter}", Text = "add new content here" };
-
-            _sheets.Add(newSheet);
+            var newSheet = new Sheet { Title = $"Sheet {counter}" };
 
             _updateIndex = true;
 
-            Log.LogInformation("Empty sheet was added");
+            Log.LogInformation("New empty sheet was added");
 
             return newSheet;
         }
@@ -78,23 +81,30 @@ namespace notepad.Pages
             }
         }
 
-        private async Task AddTabCallback()
+        private async Task AddSheetCallback()
         {
-            await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
-            var newSheet = AddNewSheet();
-            db.Sheets.Add(newSheet);
-            await db.SaveChangesAsync();
+            var sheet = CreateEmptySheet();
+            await AddSheet(sheet);
+            _sheets.Add(sheet);
         }
 
-        private async Task CloseTabCallback(MudTabPanel panel)
+        private async Task RemoveSheetCallback(MudTabPanel panel)
         {
             var sheet = _sheets.FirstOrDefault(x => x.Id == (int)panel.Tag);
             if (sheet != null)
             {
-                await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
-                db.Entry(sheet).State = EntityState.Deleted;
-                await db.SaveChangesAsync();
+                var result = await (DialogService.Show<DialogConfirm>("Confirm", new DialogParameters())).Result;
+                if (result.Cancelled || !bool.TryParse(result.Data.ToString(), out bool _)) return;
+
+                await RemoveSheet(sheet);
                 _sheets.Remove(sheet);
+
+                if (_sheets.Count == 0)
+                {
+                    sheet = CreateEmptySheet();
+                    await AddSheet(sheet);
+                    _sheets.Add(sheet);
+                }
             }
         }
 
@@ -102,6 +112,29 @@ namespace notepad.Pages
         {
             Log.LogInformation($"Panel Index:{_index} Value: {newValue}");
             await Task.Delay(1);
+        }
+
+        private async Task RemoveSheet(Sheet sheet)
+        {
+            await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
+            db.Entry(sheet).State = EntityState.Deleted;
+            await db.SaveChangesAsync();
+            _isLoading = false;
+        }
+
+        private async Task AddSheet(Sheet sheet)
+        {
+            await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
+            db.Entry(sheet).State = EntityState.Added;
+            await db.SaveChangesAsync();
+            _isLoading = false;
+        }
+
+        private async Task UpdateSheets(IEnumerable<Sheet> sheets)
+        {
+            await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
+            sheets.Where(_ => !_.IsEmpty()).ToList().ForEach(_ => db.Entry(_).State = EntityState.Modified);
+            await db.SaveChangesAsync();
         }
     }
 }

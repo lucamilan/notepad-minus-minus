@@ -1,24 +1,32 @@
 ﻿@inherits LayoutComponentBase
+@inject EventNotifier Notifier
 
 <MudThemeProvider Theme="MyCustomTheme" />
-<MudDialogProvider />
+<MudDialogProvider FullWidth="true" MaxWidth="MaxWidth.Small" />
 <MudSnackbarProvider />
 <MudLayout>
-     <MudAppBar Elevation="1">
+    <MudAppBar Elevation="1">
         <MudText Typo="Typo.h4" Class="ml-3">Notepad</MudText>
         <MudText Typo="Typo.h6" Class="ml-3">minus minus</MudText>
         <MudSpacer />
-        <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End" />
+        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="SaveAllClick" />
+        <MudIconButton Href="https://github.com/lucamilan/notepad-minus-minus" Icon="@Icons.Custom.Brands.GitHub"  Color="Color.Inherit" Edge="Edge.End" />
     </MudAppBar>
-    <MudMainContent> 
-        <MudPaper Elevation="1" Class="pa-3" Outlined="true" Square="true">
+    <MudMainContent>
+        <MudPaper Elevation="2" Class="pa-3" Outlined="true">
             @Body
         </MudPaper>
     </MudMainContent>
 </MudLayout>
 
 
-@code{
+@code {
+
+    private async Task SaveAllClick(MouseEventArgs args)
+    {
+        await Notifier.SaveAllAsync();
+    }
+
     MudTheme MyCustomTheme = new MudTheme()
     {
         Palette = new Palette()
