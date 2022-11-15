@@ -20,9 +20,27 @@ else
 
         @foreach (var sheet in _sheets)
         {
-            <MudTabPanel ToolTip="@sheet.Tooltip()" Text="@sheet.Title" Tag="@sheet.Id" BadgeColor="@(sheet.IsEmpty()? Color.Surface : Color.Success)"
-        BadgeDot="true">
-                <MudTextField  Style="width: 100%; height: 90%;" Lines="25" TextChanged="OnTextChangeHandler" T="string" Label="@sheet.CreatedAt.ToString()" Variant="Variant.Outlined" @bind-Value="@sheet.Text" />
+            <MudTabPanel ToolTip="@sheet.Tooltip()" Text="@sheet.Title" Tag="@sheet.Id"
+        BadgeColor="@(sheet.IsEmpty()? Color.Surface : Color.Success)" BadgeDot="true">
+                @if (CanShowMarkdownPreview(sheet.Id))
+                {
+                    <MudGrid>
+                        <MudItem xs="12" sm="11">
+                            @((MarkupString) @sheet.Preview)
+                        </MudItem>
+                        <MudItem xs="12" sm="1">
+                            <MudIconButton Title="Show Editor" Icon="@Icons.Custom.Brands.MudBlazor"
+                    OnClick="OnShowMarkdownPreview" />
+                        </MudItem>
+                    </MudGrid>
+                }
+                else
+                {
+                    <MudTextField Adornment="Adornment.End" AdornmentIcon="@Icons.Custom.Brands.MudBlazor"
+            OnAdornmentClick="OnShowMarkdownPreview" Style="width: 100%; height: 90%;" Lines="25"
+            TextChanged="OnTextChangeHandler" T="string" Label="@sheet.CreatedAt.ToString()" Variant="Variant.Outlined"
+            @bind-Value="@sheet.Text" />
+                }
             </MudTabPanel>
         }
 

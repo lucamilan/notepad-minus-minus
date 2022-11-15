@@ -2,12 +2,14 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor;
 using notepad.Data;
+using notepad.Shared;
 
 namespace notepad.Pages
 {
     public partial class Index : IDisposable
     {
-        public bool _autoSaveOn = false;
+        private Dictionary<int,bool> _previewMarkdown = new();
+        private bool _autoSaveOn = false;
         private PeriodicTimer? _periodicTimer;
         private List<Sheet> _sheets = new();
         private MudDynamicTabs? _tabsRef = null!;
@@ -41,6 +43,23 @@ namespace notepad.Pages
             }
 
             _isLoading = false;
+        }
+
+        private bool CanShowMarkdownPreview(int sheetId){
+            return _previewMarkdown.TryGetValue(sheetId, out bool preview) && preview;
+        }
+
+        private void OnShowMarkdownPreview(){
+            var value = true;
+            var id = _sheets[_index].Id;
+            
+            if(_previewMarkdown.TryGetValue(id, out bool preview) && _previewMarkdown.Remove(id)){
+                value = !preview;
+            }
+            
+            _previewMarkdown.TryAdd(id, value);
+            
+            Log.LogInformation($"PreviewMarkdown {id} is on: {value}");            
         }
 
         protected async void RunTimer()
@@ -164,6 +183,7 @@ namespace notepad.Pages
             await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
             sheets.Where(_ => !_.IsEmpty()).ToList().ForEach(_ => db.Entry(_).State = EntityState.Modified);
             await db.SaveChangesAsync();
+            _isLoading = false;
         }
     }
 }
