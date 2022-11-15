@@ -9,7 +9,10 @@
         <MudText Typo="Typo.h4" Class="ml-3">Notepad</MudText>
         <MudText Typo="Typo.h6" Class="ml-3">minus minus</MudText>
         <MudSpacer />
-        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="SaveAllClick" />
+        
+        <MudSwitch CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Label="Autosave" LabelPosition="LabelPosition.Start" Color="Color.Warning" />
+
+        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="OnSaveAllClick" />
         <MudIconButton Href="https://github.com/lucamilan/notepad-minus-minus" Icon="@Icons.Custom.Brands.GitHub"  Color="Color.Inherit" Edge="Edge.End" />
     </MudAppBar>
     <MudMainContent>
@@ -21,10 +24,14 @@
 
 
 @code {
-
-    private async Task SaveAllClick(MouseEventArgs args)
+    private async Task OnSaveAllClick(MouseEventArgs args)
     {
         await Notifier.SaveAllAsync();
+    }
+
+    private async Task OnAutoSaveEnabledChanged(bool args)
+    {
+        await Notifier.AutoSaveEnabledAsync(args);
     }
 
     MudTheme MyCustomTheme = new MudTheme()

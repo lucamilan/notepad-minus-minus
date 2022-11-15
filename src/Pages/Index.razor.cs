@@ -5,8 +5,10 @@ using notepad.Data;
 
 namespace notepad.Pages
 {
-    public partial class Index
+    public partial class Index : IDisposable
     {
+        public bool _autoSaveOn = false;
+        private PeriodicTimer? _periodicTimer;
         private List<Sheet> _sheets = new();
         private MudDynamicTabs? _tabsRef = null!;
         [Inject]
@@ -24,6 +26,7 @@ namespace notepad.Pages
         protected override async Task OnInitializedAsync()
         {
             Notifier.SaveAll += OnSaveAll;
+            Notifier.AutoSaveEnabled += OnAutoSaveEnabled;
 
             await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
 
@@ -40,22 +43,45 @@ namespace notepad.Pages
             _isLoading = false;
         }
 
+        protected async void RunTimer()
+        {
+            if (_periodicTimer is null) return;
+
+            while (await _periodicTimer.WaitForNextTickAsync())
+            {
+                await UpdateSheets(_sheets);
+                await InvokeAsync(StateHasChanged);
+                Log.LogInformation("Doc automatically saved");
+            }
+        }
+
         private async Task OnSaveAll()
         {
             _isLoading = true;
+            await UpdateSheets(_sheets);
+            await InvokeAsync(StateHasChanged);
+            _isLoading = false;
+            Log.LogInformation("Doc globally saved");
+        }
 
-            await InvokeAsync(async () =>
+        private Task OnAutoSaveEnabled(bool value)
+        {
+            _autoSaveOn = value;
+            _periodicTimer?.Dispose();
+            if (_autoSaveOn)
             {
-                await UpdateSheets(_sheets);
-                StateHasChanged();
-                _isLoading = false;
-                Log.LogInformation("Doc globally saved");
-            });
+                Log.LogInformation($"Enable autosave status on: {_autoSaveOn}");
+                _periodicTimer = new(TimeSpan.FromSeconds(10));
+                RunTimer();
+            }
+            return Task.CompletedTask;
         }
 
         public void Dispose()
         {
             Notifier.SaveAll -= OnSaveAll;
+            Notifier.AutoSaveEnabled -= OnAutoSaveEnabled;
+            _periodicTimer?.Dispose();
         }
 
         private Sheet CreateEmptySheet()
@@ -93,8 +119,11 @@ namespace notepad.Pages
             var sheet = _sheets.FirstOrDefault(x => x.Id == (int)panel.Tag);
             if (sheet != null)
             {
-                var result = await (DialogService.Show<DialogConfirm>("Confirm", new DialogParameters())).Result;
-                if (result.Cancelled || !bool.TryParse(result.Data.ToString(), out bool _)) return;
+                if (!sheet.IsEmpty())
+                {
+                    var result = await (DialogService.Show<DialogConfirm>("Confirm", new DialogParameters())).Result;
+                    if (result.Cancelled || !bool.TryParse(result.Data.ToString(), out bool _)) return;
+                }
 
                 await RemoveSheet(sheet);
                 _sheets.Remove(sheet);
@@ -110,7 +139,7 @@ namespace notepad.Pages
 
         protected async Task OnTextChangeHandler(string newValue)
         {
-            Log.LogInformation($"Panel Index:{_index} Value: {newValue}");
+            if (_index >= 0) _sheets[_index].SetTitle();
             await Task.Delay(1);
         }
 
