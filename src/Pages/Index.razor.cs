@@ -119,6 +119,7 @@ namespace notepad.Pages
 
             var newSheet = new Sheet
             {
+                Title = "Sample note",
                 Text = $"# Sample note{Environment.NewLine}You can also *write* your note using basic markdown syntax."
             };
 
