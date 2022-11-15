@@ -10,6 +10,8 @@ namespace notepad.Pages
     {
         private Dictionary<int, bool> _previewMarkdown = new();
         private bool _autoSaveOn = false;
+        [Inject]
+        private ISnackbar Snackbar{ get; set; } = null!;
         private PeriodicTimer? _periodicTimer;
         private List<Sheet> _sheets = new();
         private MudDynamicTabs? _tabsRef = null!;
@@ -81,6 +83,12 @@ namespace notepad.Pages
         {
             _isLoading = true;
             await UpdateSheets(_sheets);
+            Snackbar.Add("All notes was saved!", Severity.Warning, config =>
+            {
+                config.Icon = Icons.Filled.Announcement;
+                config.IconColor = Color.Dark;
+                config.IconSize = Size.Large;
+            });
             await InvokeAsync(StateHasChanged);
             _isLoading = false;
             Log.LogInformation("Doc globally saved");

@@ -1,18 +1,22 @@
 ﻿@inherits LayoutComponentBase
 @inject EventNotifier Notifier
 
-<MudThemeProvider Theme="MyCustomTheme" />
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="@_isDarkMode"/>
 <MudDialogProvider FullWidth="true" MaxWidth="MaxWidth.Small" />
 <MudSnackbarProvider />
 <MudLayout>
     <MudAppBar Elevation="1">
         <MudText Typo="Typo.h4" Class="ml-3">Notepad</MudText>
-        <MudText Typo="Typo.h6" Class="ml-3">minus minus</MudText>
+        <MudText Typo="Typo.h3" Class="ml-3">- -</MudText>
         <MudSpacer />
-        
-        <MudSwitch CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Label="Autosave" LabelPosition="LabelPosition.Start" Color="Color.Warning" />
 
-        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="OnSaveAllClick" />
+        <MudElement HtmlTag="span" Class="ma-0" Style="font-weight:bold;">
+            Your text will be saved in your browser storage
+        </MudElement>    
+        
+        <MudSwitch CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Color="Color.Primary" Label="Autosave" LabelPosition="LabelPosition.Start" />
+        <MudSwitch @bind-Checked="@_isDarkMode" Color="Color.Primary" T="bool" Label="Dark Mode" LabelPosition="LabelPosition.Start"/>
+        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="OnSaveAllClick" Size="Size.Large" />
         <MudIconButton Href="https://github.com/lucamilan/notepad-minus-minus" Icon="@Icons.Custom.Brands.GitHub"  Color="Color.Inherit" Edge="Edge.End" />
     </MudAppBar>
     <MudMainContent>
@@ -24,6 +28,7 @@
 
 
 @code {
+    private bool _isDarkMode;
     private async Task OnSaveAllClick(MouseEventArgs args)
     {
         await Notifier.SaveAllAsync();
@@ -34,7 +39,7 @@
         await Notifier.AutoSaveEnabledAsync(args);
     }
 
-    MudTheme MyCustomTheme = new MudTheme()
+    private MudTheme _theme = new MudTheme()
     {
         Palette = new Palette()
         {
