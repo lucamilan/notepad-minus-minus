@@ -33,7 +33,7 @@
       "Microsoft.JSInterop.WebAssembly.dll": "sha256-i2xGLiyWjCECt4ok6MjGtUR2qelVsWU00AlcAateTFE=",
       "MudBlazor.dll": "sha256-wlQ6CXi3IqYnPr95\/7B7+34gNeXtlr+x1htvgzryQgk=",
       "netstandard.dll": "sha256-A6gbx6SgDC0gDkK5s79tz2RYmj\/\/L3W3bR2wv5ySiko=",
-      "notepad.dll": "sha256-1Ic5rIVx8TbQyOvf30HVJv2tkR7Cy8BwBh5c+Kjhv5I=",
+      "notepad.dll": "sha256-sGeGH6abyNr\/+iX86hBEG7bsAAN+KHppZnnffUy6dC8=",
       "SQLitePCLRaw.batteries_v2.dll": "sha256-QKXdVPR3+dDapThW25ARyok9JtLTTRTdLoG6LfEQQhg=",
       "SQLitePCLRaw.core.dll": "sha256-l57cyQVqwG1fUrEtm3czsSF5FKtQvxI6sxLgJ+esV6U=",
       "SQLitePCLRaw.provider.e_sqlite3.dll": "sha256-RwA\/P9Qppbadb8bP0Wv82XkQMhcB5eeoiQYWQ8gdCGU=",
@@ -87,7 +87,6 @@
     "pdb": null,
     "runtime": {
       "dotnet.7.0.0.qkhu0mg2ml.js": "sha256-A7XtufkDFxCJl9SM0VfEGTdEwcZMXvl4RSJvFVpSyZ8=",
-      "dotnet.timezones.blat": "sha256-NFPG+mWpX1lpilZGC5d9W\/8+Yjx+6oW2ujo2u+HYW1Q=",
       "dotnet.wasm": "sha256-UxL6BgPYj3UoTBN7BfpVfem0Tbo0xsSuumL5GrJUhcg=",
       "icudt_CJK.dat": "sha256-SZLtQnRc0JkwqHab0VUVP7T3uBPSeYzxzDnpxPpUnHk=",
       "icudt_EFIGS.dat": "sha256-l7NtS3cI+3VUoQ2XQvlzMb8x4Ow1BtnOJNLWc6bifW0=",
