@@ -16,8 +16,8 @@
         
         <MudSwitch CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Color="Color.Primary" Label="Autosave" LabelPosition="LabelPosition.Start" />
         <MudSwitch @bind-Checked="@_isDarkMode" Color="Color.Primary" T="bool" Label="Dark Mode" LabelPosition="LabelPosition.Start"/>
-        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="OnSaveAllClick" Size="Size.Large" />
-        <MudIconButton Href="https://github.com/lucamilan/notepad-minus-minus" Icon="@Icons.Custom.Brands.GitHub"  Color="Color.Inherit" Edge="Edge.End" />
+        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="OnSaveAllClick" Size="Size.Large" Title="Save all notes" />
+        @* <MudIconButton Href="https://github.com/lucamilan/notepad-minus-minus" Icon="@Icons.Custom.Brands.GitHub"  Color="Color.Inherit" Edge="Edge.End" /> *@
     </MudAppBar>
     <MudMainContent>
         <MudPaper Elevation="2" Class="pa-3" Outlined="true">

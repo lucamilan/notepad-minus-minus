@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.JSInterop;
 using MudBlazor;
 using MudBlazor.Services;
@@ -25,8 +26,9 @@ builder.Services.AddMudServices(config =>
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddDbContextFactory<NotepadDbContext>(options =>
   options.UseSqlite($"Filename={DbConstants.SqliteDbFilename}")
-         .LogTo(Console.WriteLine, LogLevel.Critical)
-         .EnableSensitiveDataLogging());
+         .LogTo(Console.WriteLine,  new[] { CoreEventId.ContextDisposed, CoreEventId.ContextInitialized })
+         //.EnableSensitiveDataLogging()
+         );
 builder.Services.AddScoped<DataSynchronizer>();
 builder.Services.AddScoped<EventNotifier>();
 
