@@ -42,6 +42,15 @@ namespace notepad.Data
             Title = GetTitle(true);
         }
 
+        public int GetRows()
+        {
+            int maxRows = 25;
+            int minRows = 15;
+            var text = Text ?? "";
+            var rowCount = Math.Max(text.Split('\n').Length, text.Split('\r').Length);
+            return Math.Min(Math.Max(rowCount, minRows), maxRows);
+        }
+
         private string? GetTitle(bool truncate = true)
         {
             var safeTitle = Markdown.ToPlainText(Title ?? "", Pipeline);

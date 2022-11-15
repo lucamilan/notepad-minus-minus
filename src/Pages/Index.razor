@@ -37,7 +37,7 @@ else
                 else
                 {
                     <MudTextField Adornment="Adornment.End" AdornmentIcon="@Icons.Filled.Preview"
-            OnAdornmentClick="OnShowMarkdownPreview" Style="width: 100%; height: 90%;" Lines="25"
+            OnAdornmentClick="OnShowMarkdownPreview" Style="width: 100%; height: 90%;" Lines="@sheet.GetRows()"
             TextChanged="OnTextChangeHandler" T="string" Label="@sheet.CreatedAt.ToString()" Variant="Variant.Outlined"
             @bind-Value="@sheet.Text" />
                 }
