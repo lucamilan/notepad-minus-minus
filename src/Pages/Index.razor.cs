@@ -11,7 +11,7 @@ namespace notepad.Pages
         private Dictionary<int, bool> _previewMarkdown = new();
         private bool _autoSaveOn = false;
         [Inject]
-        private ISnackbar Snackbar{ get; set; } = null!;
+        private ISnackbar Snackbar { get; set; } = null!;
         private PeriodicTimer? _periodicTimer;
         private List<Sheet> _sheets = new();
         private MudDynamicTabs? _tabsRef = null!;
@@ -78,7 +78,6 @@ namespace notepad.Pages
                 Log.LogInformation("Doc automatically saved");
             }
         }
-
         private async Task OnSaveAll()
         {
             _isLoading = true;
@@ -118,8 +117,9 @@ namespace notepad.Pages
         {
             var counter = _sheets.Count + 1;
 
-            var newSheet = new Sheet { 
-                Text = $"# Sample note {Environment.NewLine} You can also *write* your note using basic markdown syntax."
+            var newSheet = new Sheet
+            {
+                Text = $"# Sample note{Environment.NewLine}You can also *write* your note using basic markdown syntax."
             };
 
             _updateIndex = true;
