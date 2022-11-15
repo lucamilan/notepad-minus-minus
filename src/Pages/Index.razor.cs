@@ -8,7 +8,7 @@ namespace notepad.Pages
 {
     public partial class Index : IDisposable
     {
-        private Dictionary<int,bool> _previewMarkdown = new();
+        private Dictionary<int, bool> _previewMarkdown = new();
         private bool _autoSaveOn = false;
         private PeriodicTimer? _periodicTimer;
         private List<Sheet> _sheets = new();
@@ -45,21 +45,24 @@ namespace notepad.Pages
             _isLoading = false;
         }
 
-        private bool CanShowMarkdownPreview(int sheetId){
+        private bool CanShowMarkdownPreview(int sheetId)
+        {
             return _previewMarkdown.TryGetValue(sheetId, out bool preview) && preview;
         }
 
-        private void OnShowMarkdownPreview(){
+        private void OnShowMarkdownPreview()
+        {
             var value = true;
             var id = _sheets[_index].Id;
-            
-            if(_previewMarkdown.TryGetValue(id, out bool preview) && _previewMarkdown.Remove(id)){
+
+            if (_previewMarkdown.TryGetValue(id, out bool preview) && _previewMarkdown.Remove(id))
+            {
                 value = !preview;
             }
-            
+
             _previewMarkdown.TryAdd(id, value);
-            
-            Log.LogInformation($"PreviewMarkdown {id} is on: {value}");            
+
+            Log.LogInformation($"PreviewMarkdown {id} is on: {value}");
         }
 
         protected async void RunTimer()
@@ -107,7 +110,9 @@ namespace notepad.Pages
         {
             var counter = _sheets.Count + 1;
 
-            var newSheet = new Sheet { Title = $"Sheet {counter}" };
+            var newSheet = new Sheet { 
+                Text = $"# Sample note {Environment.NewLine} You can also *write* your note using basic markdown syntax."
+            };
 
             _updateIndex = true;
 

@@ -4,15 +4,15 @@
 
 @if (_isLoading)
 {
-    <MudProgressLinear Color="Color.Primary" Size="Size.Large" Indeterminate="true" Class="my-7">
+    <MudProgressLinear Color="Color.Primary" Size="Size.Large" Indeterminate="true" Style="height: 25px!important;">
         <MudText Typo="Typo.subtitle1" Color="Color.Dark">
-            <b>Waiting few seconds...</b>
+            <b>Please be patient, Notepad -- is loading...</b>
         </MudText>
     </MudProgressLinear>
 }
 else
 {
-    <MudDynamicTabs Dense="true" Margin="Margin.Dense" Position="Position.Top" @ref="_tabsRef"
+    <MudDynamicTabs Dense="false" Margin="Margin.Dense" Position="Position.Top" @ref="_tabsRef"
     CloseTab="@((panel) => RemoveSheetCallback(panel))" AddTab="AddSheetCallback" @bind-ActivePanelIndex="_index"
     Elevation="3" Rounded="true" ApplyEffectsToContainer="true" PanelClass="px-4 py-6"
     AddIconToolTip="Click here to add a new sheet" CloseIconToolTip="Remove this sheet. All data will be lost"
@@ -29,14 +29,14 @@ else
                             @((MarkupString) @sheet.Preview)
                         </MudItem>
                         <MudItem xs="12" sm="1">
-                            <MudIconButton Title="Show Editor" Icon="@Icons.Custom.Brands.MudBlazor"
+                            <MudIconButton Title="Show Editor" Icon="@Icons.Filled.EditNote"
                     OnClick="OnShowMarkdownPreview" />
                         </MudItem>
                     </MudGrid>
                 }
                 else
                 {
-                    <MudTextField Adornment="Adornment.End" AdornmentIcon="@Icons.Custom.Brands.MudBlazor"
+                    <MudTextField Adornment="Adornment.End" AdornmentIcon="@Icons.Filled.Preview"
             OnAdornmentClick="OnShowMarkdownPreview" Style="width: 100%; height: 90%;" Lines="25"
             TextChanged="OnTextChangeHandler" T="string" Label="@sheet.CreatedAt.ToString()" Variant="Variant.Outlined"
             @bind-Value="@sheet.Text" />
