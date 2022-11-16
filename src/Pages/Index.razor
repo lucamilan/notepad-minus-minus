@@ -20,7 +20,7 @@
                 {
                     <MudGrid Spacing="0" Style="width: 99%;" Class="rounded d-flex border-solid border mud-border-primary pa-4">
                         <MudItem sm="11" Style="padding: 4px;">
-                            <div class="markdownarea" @onclick="OnShowMarkdownPreview">
+                            <div class="markdownarea" @ondblclick="OnShowMarkdownPreview">
                                 <Markdown Text="@sheet.Text"></Markdown>
                             </div>
                         </MudItem>
