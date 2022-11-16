@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject EventNotifier Notifier
+@inject IConfiguration Config
 
 <MudThemeProvider Theme="_theme" @bind-IsDarkMode="@_isDarkMode"/>
 <MudDialogProvider FullWidth="true" MaxWidth="MaxWidth.Small" />
@@ -11,7 +12,7 @@
         <MudSpacer />
 
         <MudElement HtmlTag="span" Class="ma-0" Style="font-weight:bold;">
-            Your text will be saved in your browser storage
+            @Config["AppBar_Message"]            
         </MudElement>    
         
         <MudSwitch CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Color="Color.Primary" Label="Autosave" LabelPosition="LabelPosition.Start" />
