@@ -39,7 +39,9 @@ else
                 {
                     <MudGrid Spacing="0" Style="width: 99%;" Class="rounded d-flex border-solid border mud-border-primary pa-4">
                         <MudItem sm="11" Style="padding: 4px;">
-                             <Markdown Text="@sheet.Text"></Markdown>
+                            <div class="markdownarea">
+                                <Markdown Text="@sheet.Text"></Markdown>
+                            </div>
                         </MudItem>
                         <MudItem sm="1" Class="d-flex align-content-center justify-end flex-wrap">
                             <MudIconButton Title="Show Editor" Size="Size.Large" Icon="@Icons.Filled.EditNote" OnClick="OnShowMarkdownPreview" />

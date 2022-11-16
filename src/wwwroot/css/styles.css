@@ -1,0 +1,28 @@
+html,
+body {
+  overflow-x: hidden;
+}
+div.markdownarea > ul {
+  margin-left: 10px;
+  list-style: square;
+  list-style-position: outside;
+}
+
+/* Second Level */
+div.markdownarea > ul ul {
+  margin-left: 15px;
+}
+
+/* Third Level */
+div.markdownarea > ul ul ul {
+  margin-left: 20px;
+}
+
+div.markdownarea > ol {
+  margin-left: 2%;
+  list-style-position: outside;
+}
+div.markdownarea > p {
+  padding: 2px;
+  line-height: 180%;
+}
