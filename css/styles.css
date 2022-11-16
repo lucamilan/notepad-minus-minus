@@ -48,3 +48,7 @@ div.markdownarea > blockquote:before {
 div.markdownarea > blockquote p {
   display: inline;
 }
+
+div.markdownarea > hr {
+  border-top: 1px solid gray;
+}
