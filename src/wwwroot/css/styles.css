@@ -40,7 +40,13 @@ div.markdownarea > ol ol ol {
 
 div.markdownarea > p {
   padding: 2px;
-  line-height: 180%;
+  line-height: 50x;
+}
+
+div.markdownarea > hr, h2, h3, h3, h4, h5, h6 {
+  padding-top: 15px;
+  padding-bottom: 10px;
+  line-height: 50x;
 }
 
 div.markdownarea > blockquote {
@@ -66,4 +72,9 @@ div.markdownarea > blockquote p {
 
 div.markdownarea > hr {
   border-top: 1px solid gray;
+}
+
+div.markdownarea > pre {
+  white-space: pre-wrap;
+  overflow-x: auto;
 }
