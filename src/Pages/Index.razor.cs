@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor;
@@ -14,7 +15,7 @@ namespace notepad.Pages
         private ISnackbar Snackbar { get; set; } = null!;
         private PeriodicTimer? _periodicTimer;
         private List<Sheet> _sheets = new();
-        private MudDynamicTabs? _tabsRef = null!;
+        private MudDynamicTabs? _sheetsRef = null!;
         [Inject]
         private IDialogService DialogService { get; set; } = null!;
         [Inject]
@@ -192,10 +193,10 @@ namespace notepad.Pages
             _isLoading = false;
         }
 
-        private async Task UpdateSheets(IEnumerable<Sheet> sheets)
+        private async Task UpdateSheets(List<Sheet> sheets)
         {
             await using var db = await DataSynchronizer.GetPreparedDbContextAsync();
-            sheets.Where(_ => !_.IsEmpty()).ToList().ForEach(_ => db.Entry(_).State = EntityState.Modified);
+            sheets.ForEach(_ => db.Entry(_).State = EntityState.Modified);
             await db.SaveChangesAsync();
             _isLoading = false;
         }

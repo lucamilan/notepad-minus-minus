@@ -1,42 +1,24 @@
-using Markdig;
-using Markdig.Extensions.EmphasisExtras;
+using notepad.Services;
 using System.ComponentModel.DataAnnotations;
 
 namespace notepad.Data
 {
     public class Sheet
     {
-        private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-                .UseAutoLinks()
-                .UseAdvancedExtensions()
-                .UseEmphasisExtras(EmphasisExtraOptions.Default)
-                .UseTaskLists()
-                .UseAbbreviations()
-                .UseDefinitionLists()
-                .UseAutoIdentifiers()
-                .UseEmojiAndSmiley()
-                .UseSoftlineBreakAsHardlineBreak()
-                .UseGridTables()
-                .UseCustomContainers()
-                .UseFigures()
-                .UseFooters()
-                .UseCitations()
-                .Build();
         public int Id { get; set; }
 
         [MaxLength(255)]
         public string? Title { get; set; }
 
         [MaxLength(int.MaxValue)]
-        public string? Text { get; set; } = "add new content here";
+        public string? Text { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        public bool IsEmpty() => "add new content here".Equals(Text, StringComparison.InvariantCultureIgnoreCase);
+        public bool IsEmpty() => GetTitle(false)?.StartsWith("Sample note", StringComparison.InvariantCultureIgnoreCase) == true;
 
         public string Tooltip() => $"'{GetTitle(false)}' was created on {CreatedAt}";
 
-        public string Preview => Markdown.ToHtml(Text ?? "## No Content here!", Pipeline);
         public void SetTitle()
         {
             Title = GetTitle(true);
@@ -53,14 +35,14 @@ namespace notepad.Data
 
         private string? GetTitle(bool truncate = true)
         {
-            var safeTitle = Markdown.ToPlainText(Title ?? "", Pipeline);
-            if (IsEmpty() || string.IsNullOrWhiteSpace(Text)) return safeTitle;
+            var safeTitle = MarkdownService.ToPlainText(Title);
+            if (string.IsNullOrWhiteSpace(Text)) return safeTitle;
             var title = Text?.Trim().Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).FirstOrDefault();
             if (string.IsNullOrWhiteSpace(title))
             {
                 return safeTitle;
             }
-            safeTitle = Markdown.ToPlainText(title ?? "", Pipeline);
+            safeTitle = MarkdownService.ToPlainText(title);
             return truncate ? Truncate(safeTitle, 27) : safeTitle;
         }
 

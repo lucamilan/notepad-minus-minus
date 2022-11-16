@@ -12,34 +12,53 @@
 }
 else
 {
-    <MudDynamicTabs Dense="false" Margin="Margin.Dense" Position="Position.Top" @ref="_tabsRef"
-    CloseTab="@((panel) => RemoveSheetCallback(panel))" AddTab="AddSheetCallback" @bind-ActivePanelIndex="_index"
-    Elevation="3" Rounded="true" ApplyEffectsToContainer="true" PanelClass="px-4 py-6"
-    AddIconToolTip="Click here to add a new sheet" CloseIconToolTip="Remove this sheet. All data will be lost"
-    PrevIcon="@Icons.Filled.SkipPrevious" NextIcon="@Icons.Filled.SkipNext" Style="height: 90%;">
+    <MudDynamicTabs 
+        KeepPanelsAlive="true"
+        Class="mud-height-full"
+        Dense="false" 
+        Margin="Margin.Dense" 
+        Position="Position.Top" 
+        @ref="_sheetsRef"
+        CloseTab="@((panel) => RemoveSheetCallback(panel))" 
+        AddTab="AddSheetCallback" 
+        @bind-ActivePanelIndex="_index"
+        Elevation="3" 
+        Rounded="true" 
+        ApplyEffectsToContainer="true" 
+        PanelClass="px-4 py-6"
+        AddIconToolTip="Click here to add a new sheet" 
+        CloseIconToolTip="Remove this sheet. All data will be lost"
+        PrevIcon="@Icons.Filled.SkipPrevious" 
+        NextIcon="@Icons.Filled.SkipNext" Style="height: 90%;">
 
         @foreach (var sheet in _sheets)
         {
             <MudTabPanel ToolTip="@sheet.Tooltip()" Text="@sheet.Title" Tag="@sheet.Id"
-        BadgeColor="@(sheet.IsEmpty()? Color.Surface : Color.Success)" BadgeDot="true">
+        BadgeColor="@(sheet.IsEmpty()? Color.Primary : Color.Success)" BadgeDot="true">
                 @if (CanShowMarkdownPreview(sheet.Id))
                 {
-                    <MudGrid>
-                        <MudItem xs="12" sm="11">
-                            @((MarkupString) @sheet.Preview)
+                    <MudGrid Spacing="0" Style="width: 99%;" Class="rounded d-flex border-solid border mud-border-primary pa-4">
+                        <MudItem sm="11" Style="padding: 4px;">
+                             <Markdown Text="@sheet.Text"></Markdown>
                         </MudItem>
-                        <MudItem xs="12" sm="1">
-                            <MudIconButton Title="Show Editor" Icon="@Icons.Filled.EditNote"
-                    OnClick="OnShowMarkdownPreview" />
+                        <MudItem sm="1" Class="d-flex align-content-center justify-end flex-wrap">
+                            <MudIconButton Title="Show Editor" Size="Size.Large" Icon="@Icons.Filled.EditNote" OnClick="OnShowMarkdownPreview" />
                         </MudItem>
                     </MudGrid>
                 }
                 else
                 {
-                    <MudTextField Adornment="Adornment.End" AdornmentIcon="@Icons.Filled.Preview"
-            OnAdornmentClick="OnShowMarkdownPreview" Style="width: 100%; height: 90%;" Lines="@sheet.GetRows()"
-            TextChanged="OnTextChangeHandler" T="string" Label="@sheet.CreatedAt.ToString()" Variant="Variant.Outlined"
-            @bind-Value="@sheet.Text" />
+                    <MudTextField 
+                            Adornment="Adornment.End" 
+                            AdornmentIcon="@Icons.Filled.Preview" 
+                            IconSize="Size.Large"
+                            OnAdornmentClick="OnShowMarkdownPreview" 
+                            Style="width: 100%; height: 90%;" Lines="@sheet.GetRows()"
+                            TextChanged="OnTextChangeHandler" 
+                            T="string" 
+                            Label="@sheet.CreatedAt.ToString()" 
+                            Variant="Variant.Outlined"
+                            @bind-Value="@sheet.Text" />
                 }
             </MudTabPanel>
         }
