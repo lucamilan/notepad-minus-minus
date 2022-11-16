@@ -26,10 +26,11 @@ builder.Services.AddSingleton<MarkdownService>();
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddDbContextFactory<NotepadDbContext>(options =>
   options.UseSqlite($"Filename={DbConstants.SqliteDbFilename}")
-         .LogTo(Console.WriteLine, new[] { CoreEventId.ContextDisposed, CoreEventId.ContextInitialized })
+         //.LogTo(Console.WriteLine, new[] { CoreEventId.ContextDisposed, CoreEventId.ContextInitialized })
          //.EnableSensitiveDataLogging()
          );
 builder.Services.AddScoped<DataSynchronizer>();
 builder.Services.AddScoped<EventNotifier>();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 await builder.Build().RunAsync();

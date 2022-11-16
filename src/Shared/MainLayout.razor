@@ -18,8 +18,8 @@
             @Config["AppBar_Message"]
         </MudElement>
 
-        <MudSwitch CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Color="Color.Primary" Label="Autosave"
-            LabelPosition="LabelPosition.Start" />
+        <MudSwitch Checked="_autosaveEnabled" CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Color="Color.Primary"
+            Label="Autosave" LabelPosition="LabelPosition.Start" />
         <MudSwitch @bind-Checked="@_isDarkMode" Color="Color.Primary" T="bool" Label="Dark Mode"
             LabelPosition="LabelPosition.Start" />
         <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="OnSaveAllClick"
@@ -36,34 +36,7 @@
 </MudLayout>
 
 @code {
-    private bool _isDarkMode = false;
-    private bool _isLoading = true;
-    private async Task OnSaveAllClick(MouseEventArgs args)
-    {
-        await Notifier.SaveAllAsync();
-    }
 
-    private async Task OnAutoSaveEnabledChanged(bool args)
-    {
-        await Notifier.AutoSaveEnabledAsync(args);
-    }
-
-    protected override void OnInitialized()
-    {
-        Notifier.ShowSpinner += OnShowSpinner;
-    }
-
-    private async Task OnShowSpinner(bool value)
-    {
-        _isLoading = value;
-        await InvokeAsync(StateHasChanged);
-    }
-
-    public void Dispose()
-    {
-        Notifier.ShowSpinner -= OnShowSpinner;
-        Log.LogInformation($"Dispose was called");
-    }
     private MudTheme _theme = new MudTheme()
     {
         Palette = new Palette()
@@ -84,4 +57,47 @@
             DrawerWidthRight = "300px"
         }
     };
+    private bool _autosaveEnabled { get; set; } = false;
+    private bool _isDarkMode = false;
+    private bool _isLoading = true;
+
+    protected override void OnInitialized()
+    {
+        Notifier.ShowSpinner += OnShowSpinner;
+        Notifier.AutoSaveEnabled += OnAutoSaveEnabled;
+    }
+
+    public void Dispose()
+    {
+        Notifier.AutoSaveEnabled -= OnAutoSaveEnabled;
+        Notifier.ShowSpinner -= OnShowSpinner;
+        Log.LogInformation($"Dispose was called");
+    }
+
+    private async Task OnAutoSaveEnabled(bool value)
+    {
+        _autosaveEnabled = value;
+        await InvokeAsync(StateHasChanged);
+        Log.LogInformation($"OnAutoSaveEnabled was invoked outside MainLayout");
+    }
+
+    private async Task OnShowSpinner(bool value)
+    {
+        Log.LogInformation($"OnShowSpinner was invoked outside MainLayout");
+        _isLoading = value;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnSaveAllClick(MouseEventArgs args)
+    {
+        await Notifier.SaveAllAsync();
+        Log.LogInformation($"OnSaveAllClick was invoked from MainLayout");
+    }
+
+    private async Task OnAutoSaveEnabledChanged(bool value)
+    {
+        _autosaveEnabled = value;
+        await Notifier.AutoSaveEnabledAsync(value);
+        Log.LogInformation($"OnAutoSaveEnabledChanged was invoked from MainLayout");
+    }
 }

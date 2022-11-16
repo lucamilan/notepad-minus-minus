@@ -9,8 +9,10 @@ namespace notepad.Pages;
 
 public partial class Index : IDisposable
 {
-        private Dictionary<int, bool> _previewMarkdown = new();
+    private Dictionary<int, bool> _previewMarkdown = new();
     private bool _autoSaveOn = false;
+    [Inject]
+    private IConfiguration Config { get; set; } = null!;
     [Inject]
     private ISnackbar Snackbar { get; set; } = null!;
     private PeriodicTimer? _periodicTimer;
@@ -45,7 +47,14 @@ public partial class Index : IDisposable
         }
 
         _isLoading = false;
+
+        _autoSaveOn = Config["Autosave_Enabled"] == bool.TrueString;
+
         await Notifier.ShowSpinnerAsync(_isLoading);
+
+        await OnAutoSaveEnabled(_autoSaveOn);
+
+        await Notifier.AutoSaveEnabledAsync(_autoSaveOn);
     }
 
     private bool CanShowMarkdownPreview(int sheetId)
@@ -65,46 +74,48 @@ public partial class Index : IDisposable
 
         _previewMarkdown.TryAdd(id, value);
 
-        Log.LogInformation($"PreviewMarkdown {id} is on: {value}");
+        Log.LogInformation($"PreviewMarkdown for sheetId '{id}' is on: {value}");
     }
 
     protected async void RunTimer()
     {
-        if (_periodicTimer is null) return;
-
-        while (await _periodicTimer.WaitForNextTickAsync())
-        {
-            await UpdateSheets(_sheets);
-            await InvokeAsync(StateHasChanged);
-            Log.LogInformation("Doc automatically saved");
-        }
+        if (_periodicTimer is not null) while (await _periodicTimer.WaitForNextTickAsync())
+            {
+                await UpdateSheets(_sheets);
+                Log.LogInformation("Sheets was saved automatically");
+            }
     }
     private async Task OnSaveAll()
     {
-        _isLoading = true;
+        await Notifier.ShowSpinnerAsync(true);
         await UpdateSheets(_sheets);
+        Log.LogInformation("Sheets was saved");
+        await Notifier.ShowSpinnerAsync(false);
         Snackbar.Add("All notes was saved!", Severity.Warning, config =>
         {
             config.Icon = Icons.Filled.Announcement;
             config.IconColor = Color.Dark;
             config.IconSize = Size.Large;
         });
-        await InvokeAsync(StateHasChanged);
-        _isLoading = false;
-        Log.LogInformation("Doc globally saved");
     }
 
     private Task OnAutoSaveEnabled(bool value)
     {
+        Log.LogInformation($"Autosave is on: {value}");
         _autoSaveOn = value;
         _periodicTimer?.Dispose();
         if (_autoSaveOn)
         {
-            Log.LogInformation($"Enable autosave status on: {_autoSaveOn}");
-            _periodicTimer = new(TimeSpan.FromSeconds(10));
+            _periodicTimer = new(GetAutoSaveInterval());
             RunTimer();
         }
         return Task.CompletedTask;
+    }
+
+    private TimeSpan GetAutoSaveInterval()
+    {
+        var interval = Config["Autosave_Interval_In_Seconds"] ?? "60";
+        return TimeSpan.FromSeconds(int.Parse(interval));
     }
 
     public void Dispose()
