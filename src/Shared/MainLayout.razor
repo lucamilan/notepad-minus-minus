@@ -1,10 +1,13 @@
 ﻿@inherits LayoutComponentBase
 @inject EventNotifier Notifier
 @inject IConfiguration Config
+@inject ILogger<MainLayout> Log
+@implements IDisposable
 
-<MudThemeProvider Theme="_theme" @bind-IsDarkMode="@_isDarkMode"/>
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="@_isDarkMode" />
 <MudDialogProvider FullWidth="true" MaxWidth="MaxWidth.Small" />
 <MudSnackbarProvider />
+<AppOverlay IsLoading="_isLoading"></AppOverlay>
 <MudLayout>
     <MudAppBar Elevation="1">
         <MudText Typo="Typo.h4" Class="ml-3">Notepad</MudText>
@@ -12,24 +15,29 @@
         <MudSpacer />
 
         <MudElement HtmlTag="span" Class="ma-0" Style="font-weight:bold;">
-            @Config["AppBar_Message"]            
-        </MudElement>    
-        
-        <MudSwitch CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Color="Color.Primary" Label="Autosave" LabelPosition="LabelPosition.Start" />
-        <MudSwitch @bind-Checked="@_isDarkMode" Color="Color.Primary" T="bool" Label="Dark Mode" LabelPosition="LabelPosition.Start"/>
-        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="OnSaveAllClick" Size="Size.Large" Title="Save all notes" />
-        @* <MudIconButton Href="https://github.com/lucamilan/notepad-minus-minus" Icon="@Icons.Custom.Brands.GitHub"  Color="Color.Inherit" Edge="Edge.End" /> *@
+            @Config["AppBar_Message"]
+        </MudElement>
+
+        <MudSwitch CheckedChanged="OnAutoSaveEnabledChanged" T="bool" Color="Color.Primary" Label="Autosave"
+            LabelPosition="LabelPosition.Start" />
+        <MudSwitch @bind-Checked="@_isDarkMode" Color="Color.Primary" T="bool" Label="Dark Mode"
+            LabelPosition="LabelPosition.Start" />
+        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Inherit" Edge="Edge.End" OnClick="OnSaveAllClick"
+            Size="Size.Large" Title="Save all notes" />
+        @* <MudIconButton Href="https://github.com/lucamilan/notepad-minus-minus" Icon="@Icons.Custom.Brands.GitHub"
+            Color="Color.Inherit" Edge="Edge.End" /> *@
     </MudAppBar>
+
     <MudMainContent>
-        <MudPaper Elevation="2" Class="pa-3" Outlined="true">
+        <MudContainer MaxWidth="MaxWidth.False" Class="d-flex flex-column py-3 gap-1">
             @Body
-        </MudPaper>
+        </MudContainer>
     </MudMainContent>
 </MudLayout>
 
-
 @code {
-    private bool _isDarkMode;
+    private bool _isDarkMode = false;
+    private bool _isLoading = true;
     private async Task OnSaveAllClick(MouseEventArgs args)
     {
         await Notifier.SaveAllAsync();
@@ -40,6 +48,22 @@
         await Notifier.AutoSaveEnabledAsync(args);
     }
 
+    protected override void OnInitialized()
+    {
+        Notifier.ShowSpinner += OnShowSpinner;
+    }
+
+    private async Task OnShowSpinner(bool value)
+    {
+        _isLoading = value;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Notifier.ShowSpinner -= OnShowSpinner;
+        Log.LogInformation($"Dispose was called");
+    }
     private MudTheme _theme = new MudTheme()
     {
         Palette = new Palette()

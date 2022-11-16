@@ -1,35 +1,16 @@
 ﻿@page "/"
+@implements IDisposable
 
 <PageTitle>Notepad Minus Minus - Built with Blazor WASM</PageTitle>
 
-@if (_isLoading)
+@if (!_isLoading)
 {
-    <MudProgressLinear Color="Color.Primary" Size="Size.Large" Indeterminate="true" Style="height: 25px!important;">
-        <MudText Typo="Typo.subtitle1" Color="Color.Dark">
-            <b>Please be patient, Notepad -- is loading...</b>
-        </MudText>
-    </MudProgressLinear>
-}
-else
-{
-    <MudDynamicTabs 
-        KeepPanelsAlive="true"
-        Class="mud-height-full"
-        Dense="false" 
-        Margin="Margin.Dense" 
-        Position="Position.Top" 
-        @ref="_sheetsRef"
-        CloseTab="@((panel) => RemoveSheetCallback(panel))" 
-        AddTab="AddSheetCallback" 
-        @bind-ActivePanelIndex="_index"
-        Elevation="3" 
-        Rounded="true" 
-        ApplyEffectsToContainer="true" 
-        PanelClass="px-4 py-6"
-        AddIconToolTip="Click here to add a new sheet" 
-        CloseIconToolTip="Remove this sheet. All data will be lost"
-        PrevIcon="@Icons.Filled.SkipPrevious" 
-        NextIcon="@Icons.Filled.SkipNext" Style="height: 90%;">
+    <MudDynamicTabs KeepPanelsAlive="true" Class="mud-height-full" Dense="false" Margin="Margin.Dense"
+    Position="Position.Top" @ref="_sheetsRef" CloseTab="@((panel) => RemoveSheetCallback(panel))"
+    AddTab="AddSheetCallback" @bind-ActivePanelIndex="_index" Elevation="3" Rounded="true"
+    ApplyEffectsToContainer="true" PanelClass="px-4 py-6" AddIconToolTip="Click here to add a new sheet"
+    CloseIconToolTip="Remove this sheet. All data will be lost" PrevIcon="@Icons.Filled.SkipPrevious"
+    NextIcon="@Icons.Filled.SkipNext" Style="height: 90%;">
 
         @foreach (var sheet in _sheets)
         {
@@ -39,31 +20,24 @@ else
                 {
                     <MudGrid Spacing="0" Style="width: 99%;" Class="rounded d-flex border-solid border mud-border-primary pa-4">
                         <MudItem sm="11" Style="padding: 4px;">
-                            <div class="markdownarea">
+                            <div class="markdownarea" @onclick="OnShowMarkdownPreview">
                                 <Markdown Text="@sheet.Text"></Markdown>
                             </div>
                         </MudItem>
                         <MudItem sm="1" Class="d-flex align-content-center justify-end flex-wrap">
-                            <MudIconButton Title="Show Editor" Size="Size.Large" Icon="@Icons.Filled.EditNote" OnClick="OnShowMarkdownPreview" />
+                            <MudIconButton Title="Show Editor" Size="Size.Large" Icon="@Icons.Filled.EditNote"
+                    OnClick="OnShowMarkdownPreview" />
                         </MudItem>
                     </MudGrid>
                 }
                 else
                 {
-                    <MudTextField 
-                            Adornment="Adornment.End" 
-                            AdornmentIcon="@Icons.Filled.Preview" 
-                            IconSize="Size.Large"
-                            OnAdornmentClick="OnShowMarkdownPreview" 
-                            Style="width: 100%; height: 90%;" Lines="@sheet.GetRows()"
-                            TextChanged="OnTextChangeHandler" 
-                            T="string" 
-                            Label="@sheet.CreatedAt.ToString()" 
-                            Variant="Variant.Outlined"
-                            @bind-Value="@sheet.Text" />
+                    <MudTextField Adornment="Adornment.End" AdornmentIcon="@Icons.Filled.Preview" IconSize="Size.Large"
+            OnAdornmentClick="OnShowMarkdownPreview" Style="width: 100%; height: 90%;" Lines="@sheet.GetRows()"
+            TextChanged="OnTextChangeHandler" T="string" Label="@sheet.CreatedAt.ToString()" Variant="Variant.Outlined"
+            @bind-Value="@sheet.Text" />
                 }
             </MudTabPanel>
         }
-
     </MudDynamicTabs>
 }
