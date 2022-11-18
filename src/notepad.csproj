@@ -9,21 +9,32 @@
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
+    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+		<RootNamespace>notepad</RootNamespace>
+		<AssemblyName>notepad</AssemblyName>
+    <BlazorEnableTimeZoneSupport>true</BlazorEnableTimeZoneSupport>
     <BlazorEnableCompression>true</BlazorEnableCompression>
+    <InvariantGlobalization>true</InvariantGlobalization>
     <ImplicitUsings>enable</ImplicitUsings>
     <WasmBuildNative>true</WasmBuildNative>
     <!-- workaround for publish -->
+    <RunAOTCompilation>false</RunAOTCompilation>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EmccTotalMemory>16777216</EmccTotalMemory>
     <EmccExtraLDFlags>-lidbfs.js</EmccExtraLDFlags>
     <EmccExtraLDFlags>-s WARN_ON_UNDEFINED_SYMBOLS=0</EmccExtraLDFlags>
+    <!-- trim -->
+    <PublishTrimmed>True</PublishTrimmed>
+    <TrimmerRemoveSymbols>true</TrimmerRemoveSymbols>
+		<IsTrimmable>true</IsTrimmable>
+		<BlazorWebAssemblyEnableLinking>true</BlazorWebAssemblyEnableLinking>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.30.4" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="7.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="7.0.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.0" />
-    <PackageReference Include="MudBlazor" Version="6.0.18" />
+    <PackageReference Include="MudBlazor" Version="6.1.2" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.2" />
   </ItemGroup>
 </Project>
