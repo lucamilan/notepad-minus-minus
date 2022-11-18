@@ -1,11 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
-  <Target Name="ConfigureTrimming" BeforeTargets="PrepareForILLink">
-    <ItemGroup>
-      <ManagedAssemblyToLink Condition="'%(Filename)' == 'MudBlazor'">
-        <TrimMode>copyused</TrimMode>
-      </ManagedAssemblyToLink>
-    </ItemGroup>
-  </Target>
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -23,11 +16,6 @@
     <EmccTotalMemory>16777216</EmccTotalMemory>
     <EmccExtraLDFlags>-lidbfs.js</EmccExtraLDFlags>
     <EmccExtraLDFlags>-s WARN_ON_UNDEFINED_SYMBOLS=0</EmccExtraLDFlags>
-    <!-- trim -->
-    <PublishTrimmed>True</PublishTrimmed>
-    <TrimmerRemoveSymbols>true</TrimmerRemoveSymbols>
-		<IsTrimmable>true</IsTrimmable>
-		<BlazorWebAssemblyEnableLinking>true</BlazorWebAssemblyEnableLinking>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.30.4" />
