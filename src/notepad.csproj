@@ -1,19 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <Target Name="ConfigureTrimming" BeforeTargets="PrepareForILLink">
+    <ItemGroup>
+      <ManagedAssemblyToLink Condition="'%(Filename)' == 'MudBlazor'">
+        <TrimMode>copyused</TrimMode>
+      </ManagedAssemblyToLink>
+    </ItemGroup>
+  </Target>
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
-		<RootNamespace>notepad</RootNamespace>
-		<AssemblyName>notepad</AssemblyName>
-    <BlazorEnableTimeZoneSupport>true</BlazorEnableTimeZoneSupport>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
     <BlazorEnableCompression>true</BlazorEnableCompression>
-    <InvariantGlobalization>true</InvariantGlobalization>
     <ImplicitUsings>enable</ImplicitUsings>
     <WasmBuildNative>true</WasmBuildNative>
     <!-- workaround for publish -->
-    <RunAOTCompilation>false</RunAOTCompilation>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <EmccTotalMemory>16777216</EmccTotalMemory>
     <EmccExtraLDFlags>-lidbfs.js</EmccExtraLDFlags>
     <EmccExtraLDFlags>-s WARN_ON_UNDEFINED_SYMBOLS=0</EmccExtraLDFlags>
   </PropertyGroup>
@@ -22,7 +23,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="7.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="7.0.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.0" />
-    <PackageReference Include="MudBlazor" Version="6.1.2" />
+    <PackageReference Include="MudBlazor" Version="6.0.18" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.2" />
   </ItemGroup>
 </Project>
