@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waitForPendingSaves } from './support';
+import { openUnlocked, reloadUnlocked, waitForPendingSaves } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
@@ -16,7 +16,7 @@ const modeButton = (page: Page, name: string) =>
   page.getByRole('group', { name: 'Modalità di visualizzazione' }).getByRole('button', { name });
 
 async function openApp(page: Page) {
-  await page.goto('/');
+  await openUnlocked(page);
   await expect(editor(page)).toContainText('Nota di esempio');
 }
 
@@ -60,7 +60,7 @@ test('i pulsanti e Ctrl+E cambiano modalità, che resta dopo il ricaricamento', 
   await expect(editor(page)).toBeHidden();
   await expect(preview(page)).toBeFocused();
 
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(modeButton(page, 'Anteprima')).toHaveAttribute('aria-pressed', 'true');
   await expect(preview(page).getByRole('heading', { level: 1 })).toHaveText('Nota di esempio');
 

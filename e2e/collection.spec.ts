@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waitForPendingSaves } from './support';
+import { openUnlocked, reloadUnlocked, waitForPendingSaves } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
@@ -9,7 +9,7 @@ const nav = (page: Page) => page.getByRole('navigation', { name: 'Viste e tag' }
 const noteItems = (page: Page) => collection(page).locator('.note-item');
 
 async function openApp(page: Page) {
-  await page.goto('/');
+  await openUnlocked(page);
   await expect(editor(page)).toContainText('Nota di esempio');
 }
 
@@ -70,7 +70,7 @@ test('salva il filtro come vista, che resta dopo il ricaricamento e si può elim
     'true',
   );
 
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(editor(page)).toBeVisible();
   await nav(page)
     .getByRole('button', { name: /^Cliente Acme/ })
@@ -90,7 +90,7 @@ test('una nota fissata sta in cima e nella vista Fissate, anche dopo il ricarica
   await pin.click();
   await expect(pin).toHaveAttribute('aria-pressed', 'true');
   await expect(noteItems(page).first()).toContainText('Kickoff portale');
-  await page.reload();
+  await reloadUnlocked(page);
   await nav(page)
     .getByRole('button', { name: /^Fissate/ })
     .click();
@@ -116,7 +116,7 @@ test('elimina chiede conferma: Annulla non tocca nulla, Elimina cancella per sem
   await expect(dialog).toBeHidden();
   await expect(noteItems(page)).toHaveCount(3);
   await expect(page.getByRole('tab', { name: 'Lista spesa' })).toHaveCount(0);
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(editor(page)).toBeVisible();
   await expect(noteItems(page)).toHaveCount(3);
   await expect(collection(page)).not.toContainText('Lista spesa');
@@ -180,7 +180,7 @@ test('Ctrl+\\ nasconde e mostra la raccolta, e la scelta resta', async ({ page }
     'aria-expanded',
     'false',
   );
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(editor(page)).toBeVisible();
   await expect(collection(page)).toHaveCount(0);
   await page.getByRole('button', { name: 'Raccolta' }).click();

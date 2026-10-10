@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waitForPendingSaves } from './support';
+import { setupVault, unlockVault, waitForPendingSaves } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
@@ -33,13 +33,23 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('la pagina e l’editor funzionano senza violazioni CSP, errori o richieste esterne', async ({
+test('passphrase, editor e blocco funzionano senza violazioni CSP, errori o richieste esterne', async ({
   page,
   baseURL,
 }) => {
   const { errors, foreignRequests } = watchPage(page, new URL(baseURL ?? '').origin);
+  const scripts: string[] = [];
+  page.on('request', (req) => {
+    if (req.resourceType() === 'script') scripts.push(new URL(req.url()).pathname);
+  });
 
   await page.goto('/');
+  // La schermata della passphrase non scarica l'area delle note (CodeMirror, markdown-it…).
+  await expect(page.getByRole('heading', { name: 'Proteggi le tue note' })).toBeVisible();
+  expect(scripts.filter((path) => path.includes('Workspace'))).toEqual([]);
+  await setupVault(page);
+  expect(scripts.filter((path) => path.includes('Workspace'))).toHaveLength(1);
+
   const editor = page.getByRole('textbox', { name: 'Testo della nota' });
   await expect(editor).toContainText('Nota di esempio');
 
@@ -75,6 +85,15 @@ test('la pagina e l’editor funzionano senza violazioni CSP, errori o richieste
     editorDisplay: 'flex',
   });
   expect(editorStyles.adoptedSheets).toBeGreaterThan(0);
+
+  // Anche la schermata di blocco e lo sblocco restano dentro la CSP.
+  await waitForPendingSaves(page);
+  await page.getByRole('button', { name: 'Blocca' }).click();
+  await expect(page.getByRole('heading', { name: 'Note bloccate' })).toBeVisible();
+  expect(await page.evaluate(() => document.querySelectorAll('style').length)).toBe(0);
+  await unlockVault(page);
+  await expect(editor).toContainText('Riga scritta dal test');
+
   expect(await page.evaluate(() => window.__cspViolations)).toEqual([]);
   expect(errors).toEqual([]);
   expect(foreignRequests).toEqual([]);

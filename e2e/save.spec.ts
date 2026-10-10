@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waitForPendingSaves } from './support';
+import { openUnlocked, reloadUnlocked, waitForPendingSaves } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
@@ -7,7 +7,7 @@ const editor = (page: Page) => page.getByRole('textbox', { name: 'Testo della no
 const saveState = (page: Page) => page.locator('.save-state');
 
 async function openApp(page: Page) {
-  await page.goto('/');
+  await openUnlocked(page);
   await expect(editor(page)).toContainText('Nota di esempio');
   await expect(saveState(page)).toHaveText('Salvato nel browser');
 }
@@ -21,7 +21,7 @@ test('le modifiche si salvano da sole dopo una pausa e restano dopo il ricaricam
   await page.keyboard.type('\nRiga aggiunta');
 
   await expect(saveState(page)).toHaveText(/^Salvato alle \d{2}:\d{2}$/);
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(editor(page)).toContainText('Riga aggiunta');
 });
 
@@ -46,7 +46,7 @@ test('Ctrl+S salva subito e lo annuncia ai lettori di schermo', async ({ page })
   );
   await expect(saveState(page)).toHaveText(/^Salvato alle/);
 
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(editor(page)).toContainText('Urgente: # Nota di esempio');
   await expect(page.getByRole('tab').first()).toHaveText('Urgente: # Nota di esempio');
 });
@@ -60,7 +60,7 @@ test('passando da una scheda all’altra si salvano tutte le note modificate', a
   await page.keyboard.type(' (modificata)');
 
   await expect(saveState(page)).toHaveText(/^Salvato alle/);
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(page.getByRole('tab')).toHaveText(['Nota di esempio', 'Prima nuova']);
   await expect(editor(page)).toContainText('(modificata)');
 });

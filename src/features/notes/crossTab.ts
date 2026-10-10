@@ -13,12 +13,19 @@ import {
   setSavedListener,
 } from './autosave';
 import type { Note } from './note';
-import { getRepository, notesState, removeNote, replaceNote, updateNote } from './store';
+import {
+  currentLockEpoch,
+  getRepository,
+  notesState,
+  removeNote,
+  replaceNote,
+  updateNote,
+} from './store';
 
 /**
  * Avviso tra schede dello stesso browser. Viaggiano solo id e data di modifica, l'id di una
- * nota eliminata o il segnale "viste salvate cambiate" (mai testo, titoli o tag): un'altra
- * scheda sa così che la sua copia in memoria è vecchia e la rilegge dall'archivio.
+ * nota eliminata, il segnale "viste salvate cambiate" o "note bloccate" (mai testo, titoli o
+ * tag): un'altra scheda sa così che la sua copia in memoria è vecchia e la rilegge dall'archivio.
  * - nota non aperta qui e senza modifiche locali: si rilegge in silenzio;
  * - nota attiva o con modifiche non ancora salvate: avviso, e i salvataggi di quella nota
  *   restano trattenuti finché non si sceglie quale versione tenere.
@@ -26,7 +33,11 @@ import { getRepository, notesState, removeNote, replaceNote, updateNote } from '
 const CHANNEL_NAME = 'notepad-minus-minus';
 
 type Message =
-  { id: string; modifiedAt: number } | { id: string; deleted: true } | { savedViews: true };
+  | { id: string; modifiedAt: number }
+  | { id: string; deleted: true }
+  | { savedViews: true }
+  /** Blocco manuale: anche le altre schede si bloccano. */
+  | { locked: true };
 
 export type ElsewhereChange = 'modified' | 'deleted';
 
@@ -54,10 +65,27 @@ export function announceSavedViewsChanged(): void {
   post({ savedViews: true });
 }
 
+export function announceLocked(): void {
+  post({ locked: true });
+}
+
+let lockListener: (() => void) | undefined;
+
+/** Chi blocca questa scheda quando un'altra si blocca a mano (vault.ts). */
+export function setLockListener(listener: (() => void) | undefined): void {
+  lockListener = listener;
+}
+
+/** Al blocco: gli avvisi e le revisioni riguardano note che escono dalla memoria. */
+export function resetCrossTabForLock(): void {
+  changedElsewhere.value = new Map();
+  noteRevisions.value = new Map();
+}
+
 function isMessage(value: unknown): value is Message {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (v['savedViews'] === true) return true;
+  if (v['savedViews'] === true || v['locked'] === true) return true;
   if (typeof v['id'] !== 'string' || v['id'].length > 64) return false;
   return (
     v['deleted'] === true ||
@@ -90,6 +118,11 @@ function localNote(id: string): Note | undefined {
 }
 
 async function onMessage(message: Message): Promise<void> {
+  if ('locked' in message) {
+    lockListener?.();
+    return;
+  }
+  // Bloccata (o archivio non aperto): niente da rileggere, lo farà lo sblocco.
   if (notesState.value.status !== 'ready') return;
   if ('savedViews' in message) {
     await reloadSavedViews();
@@ -116,9 +149,10 @@ async function onMessage(message: Message): Promise<void> {
 }
 
 async function reloadNote(id: string): Promise<void> {
+  const epoch = currentLockEpoch();
   try {
     const fresh = await getRepository().get(id);
-    if (!fresh) return;
+    if (!fresh || currentLockEpoch() !== epoch) return;
     // Nel frattempo qui la nota potrebbe essere diventata attiva o modificata.
     if (isPendingSave(id) || tabsState.value.active === id) {
       mark(id, 'modified');
@@ -133,7 +167,10 @@ async function reloadNote(id: string): Promise<void> {
 
 async function reloadSavedViews(): Promise<void> {
   try {
-    savedViews.value = parseSavedViews(await getRepository().getMeta(SAVED_VIEWS_META_KEY));
+    const epoch = currentLockEpoch();
+    const stored = await getRepository().getMeta(SAVED_VIEWS_META_KEY);
+    // Bloccate nel frattempo: le viste restano fuori dalla memoria.
+    if (currentLockEpoch() === epoch) savedViews.value = parseSavedViews(stored);
   } catch (error) {
     console.error(error);
   }
@@ -142,7 +179,9 @@ async function reloadSavedViews(): Promise<void> {
 /** "Carica la versione più recente": scarta le modifiche locali non salvate e rilegge. */
 export async function loadLatestVersion(id: string): Promise<void> {
   const change = changedElsewhere.value.get(id);
+  const epoch = currentLockEpoch();
   const fresh = change === 'deleted' ? undefined : await getRepository().get(id);
+  if (currentLockEpoch() !== epoch) return;
   batch(() => {
     // Prima si scartano le modifiche locali, poi si libera la nota: niente da riscrivere.
     dropPendingSave(id);
@@ -161,7 +200,8 @@ export async function loadLatestVersion(id: string): Promise<void> {
 /** "Tieni questa versione": la copia di questa scheda resta e, se serve, si salva di nuovo. */
 export function keepThisVersion(id: string): void {
   const change = changedElsewhere.value.get(id);
-  if (!change) return;
+  // Nessun avviso (anche perché le note sono state bloccate nel frattempo): niente da tenere.
+  if (!change || notesState.value.status !== 'ready') return;
   mark(id, null);
   // Si riscrive subito, con una data nuova: così vince anche nelle altre schede (e una nota
   // eliminata altrove torna nell'archivio solo perché si è scelto di tenerla).

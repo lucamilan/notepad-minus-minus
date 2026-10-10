@@ -3,7 +3,7 @@ import { collectionFilter } from '../collection/state';
 import { matchesFilter } from '../collection/views';
 import { discardPendingSave } from '../notes/autosave';
 import { createNote, NEW_NOTE_TEXT, NEW_NOTE_TITLE_RANGE } from '../notes/note';
-import { addNote, getRepository, notesState, removeNote } from '../notes/store';
+import { addNote, currentLockEpoch, getRepository, notesState, removeNote } from '../notes/store';
 import { ensureEditorVisible } from '../preview/viewMode';
 import {
   hiddenTabIds,
@@ -29,6 +29,12 @@ export const tabFocusRequest = signal(0);
 
 /** Ultimo errore di un'azione sulle note, mostrato sopra le schede. */
 export const actionError = signal<string | null>(null);
+
+/** Al blocco: richieste ed errori in sospeso riguardano note che escono dalla memoria. */
+export function resetTabActionsForLock(): void {
+  editorFocusRequest.value = null;
+  actionError.value = null;
+}
 
 function commit(next: TabsState): void {
   if (next === tabsState.value) return;
@@ -108,11 +114,13 @@ export async function createNoteInNewTab(now: number = Date.now()): Promise<void
     editorFocusRequest.value = { id: note.id, selection: { ...NEW_NOTE_TITLE_RANGE } };
     openTab(note.id);
   });
+  const epoch = currentLockEpoch();
   try {
     await getRepository().put(note);
   } catch (error) {
     console.error(error);
-    if (notesState.value.status !== 'ready') return; // archivio chiuso: c'è già il messaggio
+    // Archivio chiuso (c'è già il messaggio) o note bloccate nel frattempo.
+    if (notesState.value.status !== 'ready' || currentLockEpoch() !== epoch) return;
     batch(() => {
       collectionFilter.value = filter;
       closeTab(note.id);

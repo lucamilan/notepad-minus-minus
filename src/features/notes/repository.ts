@@ -1,6 +1,6 @@
 import type { IDBPDatabase } from 'idb';
 import type { NoteCodec } from './codec';
-import type { NotepadSchema } from './database';
+import { KEYRING_META_KEY, type NotepadSchema } from './database';
 import { createNote, SAMPLE_NOTE_TEXT, sortNotes, type Note } from './note';
 
 export interface NoteList {
@@ -18,7 +18,10 @@ export interface NoteRepository {
   delete(id: string): Promise<void>;
   /** Salva `note` solo se l'archivio è vuoto, in modo atomico anche con più schede aperte. */
   addIfEmpty(note: Note): Promise<boolean>;
-  /** Dati di servizio nello store `meta`, in chiaro: mai testo o date delle note. */
+  /**
+   * Dati di servizio nello store `meta`, passati dal codec (quindi cifrati): un valore che
+   * non si riesce a leggere vale undefined. Il portachiavi non passa da qui (keyringStore.ts).
+   */
   getMeta(key: string): Promise<unknown>;
   putMeta(key: string, value: unknown): Promise<void>;
 }
@@ -80,13 +83,32 @@ export function createNoteRepository(
       await tx.done;
       return empty;
     },
-    getMeta(key) {
-      return db.get('meta', key);
+    async getMeta(key) {
+      assertNotKeyring(key);
+      const stored = await db.get('meta', key);
+      if (stored === undefined) return undefined;
+      try {
+        return await codec.decodeMeta(key, stored);
+      } catch (error) {
+        // Solo chiave e tipo di errore: mai il contenuto.
+        console.error(`Dato di servizio "${key}" illeggibile`, errorName(error));
+        return undefined;
+      }
     },
     async putMeta(key, value) {
-      await db.put('meta', value, key);
+      assertNotKeyring(key);
+      const encoded = await codec.encodeMeta(key, value);
+      await db.put('meta', encoded, key);
     },
   };
+}
+
+function assertNotKeyring(key: string): void {
+  if (key === KEYRING_META_KEY) throw new Error('Il portachiavi non passa dal repository');
+}
+
+function errorName(error: unknown): string {
+  return error instanceof Error || error instanceof DOMException ? error.name : typeof error;
 }
 
 /**

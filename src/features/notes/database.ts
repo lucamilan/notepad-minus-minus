@@ -1,4 +1,5 @@
 import {
+  deleteDB,
   openDB,
   type DBSchema,
   type IDBPDatabase,
@@ -10,12 +11,22 @@ import type { StoredNote } from './codec';
 /**
  * Nome specifico: tutte le pagine sotto lucamilan.github.io condividono la stessa origine,
  * quindi un nome generico come "notepad" potrebbe scontrarsi con un altro progetto.
+ * Da F7 le note cifrate stanno in un database nuovo: quello di F2–F6 (`LEGACY_DB_NAME`,
+ * record "plain-v1") si legge una volta per cifrarne le note e poi si elimina, così non
+ * restano copie in chiaro nelle pagine del vecchio file.
  */
-export const DB_NAME = 'notepad-minus-minus';
+export const DB_NAME = 'notepad-minus-minus-cifrato';
+export const LEGACY_DB_NAME = 'notepad-minus-minus';
+
+/** Chiave del portachiavi nello store `meta`: l'unico dato di servizio che resta in chiaro. */
+export const KEYRING_META_KEY = 'keyring';
 
 export interface NotepadSchema extends DBSchema {
   notes: { key: string; value: StoredNote };
-  /** Dati di servizio: in F7 salt e parametri della chiave, record di verifica passphrase. */
+  /**
+   * Dati di servizio: il portachiavi (`keyring`, in chiaro: salt, parametri e chiave dati
+   * cifrata) e, cifrati dal codec, schede aperte e viste salvate.
+   */
   meta: { key: string; value: unknown };
 }
 
@@ -85,4 +96,18 @@ export function openNotepadDb(
     terminated: () => events.onTerminated?.(),
   });
   return connection;
+}
+
+/**
+ * Elimina un database e si risolve quando è sparito. Se un'altra scheda lo tiene aperto la
+ * richiesta resta in attesa finché quella non chiude la connessione: chi non può aspettare
+ * non fa await e si limita a registrare il ritardo.
+ */
+export function deleteDatabase(name: string, onBlocked?: () => void): Promise<void> {
+  return deleteDB(name, {
+    blocked: () => {
+      console.warn(`Eliminazione del database ${name} in attesa: è aperto in un'altra scheda`);
+      onBlocked?.();
+    },
+  });
 }

@@ -1,7 +1,13 @@
 import { batch } from '@preact/signals';
 import { discardPendingSave, restorePendingSave, scheduleSave } from '../notes/autosave';
 import { announceDeleted, announceSavedViewsChanged } from '../notes/crossTab';
-import { getRepository, notesState, removeNote, updateNote } from '../notes/store';
+import {
+  currentLockEpoch,
+  getRepository,
+  notesState,
+  removeNote,
+  updateNote,
+} from '../notes/store';
 import { actionError, closeTab, editorFocusRequest, openTab } from '../tabs/actions';
 import { collectionFilter, isNarrowScreen, savedViews, sidebarOverlayOpen } from './state';
 import {
@@ -32,14 +38,18 @@ export async function deleteNote(id: string): Promise<boolean> {
   const note = state.status === 'ready' ? state.notes.find((n) => n.id === id) : undefined;
   if (!note) return false;
   discardPendingSave(id);
+  const epoch = currentLockEpoch();
   try {
     await getRepository().delete(id);
   } catch (error) {
     console.error(error);
+    // Bloccate nel frattempo: la nota non deve tornare in memoria (né in coda).
+    if (currentLockEpoch() !== epoch) return false;
     restorePendingSave(note);
     actionError.value = 'Non è stato possibile eliminare la nota. Riprova.';
     return false;
   }
+  if (currentLockEpoch() !== epoch) return true;
   batch(() => {
     closeTab(id);
     removeNote(id);
@@ -65,12 +75,17 @@ export function openNoteFromCollection(id: string): void {
 async function updateSavedViews(change: (views: SavedView[]) => SavedView[]): Promise<void> {
   try {
     const repo = getRepository();
-    const next = change(parseSavedViews(await repo.getMeta(SAVED_VIEWS_META_KEY)));
+    const epoch = currentLockEpoch();
+    const stored = await repo.getMeta(SAVED_VIEWS_META_KEY);
+    // Bloccate nel frattempo: le viste (nomi di tag) non devono tornare in memoria.
+    if (currentLockEpoch() !== epoch) return;
+    const next = change(parseSavedViews(stored));
     savedViews.value = next;
     await repo.putMeta(SAVED_VIEWS_META_KEY, next);
     announceSavedViewsChanged();
   } catch (error) {
     console.error('Viste non salvate', error);
+    if (notesState.value.status !== 'ready') return;
     actionError.value = 'Non è stato possibile salvare le viste. Riprova.';
   }
 }

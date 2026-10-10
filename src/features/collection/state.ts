@@ -7,8 +7,16 @@ export const collectionFilter = signal<CollectionFilter>(NO_FILTER);
 /** Nota di cui si chiede conferma dell'eliminazione (il dialogo sta fuori dal contenuto inerte). */
 export const deleteRequest = signal<string | null>(null);
 
-/** Viste salvate, lette dall'archivio all'apertura (store `meta`). */
+/** Viste salvate, lette dall'archivio all'apertura (store `meta`, cifrate). */
 export const savedViews = signal<readonly SavedView[]>([]);
+
+/** Al blocco: filtro, viste e richieste contengono tag e id delle note. */
+export function resetCollectionForLock(): void {
+  collectionFilter.value = NO_FILTER;
+  deleteRequest.value = null;
+  savedViews.value = [];
+  sidebarOverlayOpen.value = false;
+}
 
 // Prima del segnale che la legge all'avvio (una const usata prima della dichiarazione lancia).
 const STORAGE_KEY = 'notepad:sidebar';
