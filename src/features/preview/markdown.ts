@@ -49,10 +49,12 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
   return `<span class="blocked-image" title="${md.utils.escapeHtml(src)}">${md.utils.escapeHtml(label)}</span>`;
 };
 
+// La casella sta in un <label> con il testo dell'attività: è il suo nome accessibile.
 md.renderer.rules['task_checkbox'] = (tokens, idx) =>
   tokens[idx]?.meta === true
-    ? '<input type="checkbox" disabled checked> '
-    : '<input type="checkbox" disabled> ';
+    ? '<label><input type="checkbox" disabled checked> '
+    : '<label><input type="checkbox" disabled> ';
+md.renderer.rules['task_label_close'] = () => '</label>';
 
 const TASK_MARK = /^\[([ xX])\]\s+/;
 
@@ -163,6 +165,7 @@ function markTask(tokens: Token[], index: number, TokenClass: typeof Token): voi
   const box = new TokenClass('task_checkbox', '', 0);
   box.meta = match[1] !== ' ';
   inline.children?.unshift(box);
+  inline.children?.push(new TokenClass('task_label_close', '', 0));
   item.attrJoin('class', 'task');
 }
 
@@ -182,6 +185,7 @@ const ALLOWED_TAGS = [
   'hr',
   'img',
   'input',
+  'label',
   'li',
   'ol',
   'p',

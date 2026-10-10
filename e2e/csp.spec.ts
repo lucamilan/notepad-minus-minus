@@ -1,7 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { setupVault, unlockVault, waitForPendingSaves } from './support';
+import { setupVault, unlockVault, waitForPendingSaves, waitForServiceWorker } from './support';
 
-test.afterEach(async ({ page }) => waitForPendingSaves(page));
+// Qui il service worker conta: attivo come per chi usa l'app (vedi playwright.config.ts).
+test.use({ serviceWorkers: 'allow' });
+
+test.afterEach(async ({ page }) => {
+  await waitForPendingSaves(page);
+  await waitForServiceWorker(page);
+});
 
 declare global {
   interface Window {
@@ -93,6 +99,11 @@ test('passphrase, editor e blocco funzionano senza violazioni CSP, errori o rich
   expect(await page.evaluate(() => document.querySelectorAll('style').length)).toBe(0);
   await unlockVault(page);
   await expect(editor).toContainText('Riga scritta dal test');
+
+  // Il service worker si registra dentro la CSP (policy Trusted Types notepad-sw).
+  expect(
+    await page.evaluate(async () => (await navigator.serviceWorker.ready).active?.scriptURL),
+  ).toMatch(/\/sw\.js$/);
 
   expect(await page.evaluate(() => window.__cspViolations)).toEqual([]);
   expect(errors).toEqual([]);

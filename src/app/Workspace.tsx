@@ -232,8 +232,9 @@ export function Workspace() {
         <p class="notice" role="note">
           <InfoIcon />
           <span>
-            Anteprima di sviluppo: le note sono cifrate con la tua passphrase e restano solo in
-            questo browser. Se dimentichi la passphrase non si possono recuperare.
+            Le note sono cifrate con la tua passphrase e restano solo in questo browser: per
+            portarle altrove usa “Esporta note…”. Se dimentichi la passphrase non si possono
+            recuperare.
           </span>
         </p>
         <main class="workspace">

@@ -15,6 +15,7 @@ import {
   lockVault,
   resetVault,
   resetVaultForTests,
+  settleBeforeReload,
   setupVault,
   startVault,
   unlockVault,
@@ -237,6 +238,33 @@ describe('sblocco e blocco', () => {
     await lockVault();
     expect(await unlockVault(PASSPHRASE)).toBe('ok');
     expect(notes().map((n) => n.text)).toEqual(['Trattenuta al blocco']);
+  });
+
+  it('"Aggiorna" durante uno sblocco aspetta che le modifiche trattenute siano salvate', async () => {
+    await setUp();
+    const [sample] = notes();
+    if (!sample) throw new Error('nota mancante');
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const putMany = vi
+      .spyOn(getRepository(), 'putMany')
+      .mockRejectedValueOnce(new DOMException('pieno', 'QuotaExceededError'));
+    editNote(sample.id, 'Trattenuta prima dell’aggiornamento');
+    await lockVault();
+    expect(lockedQueueSize()).toBe(1);
+    putMany.mockRestore();
+
+    const order: string[] = [];
+    const unlocked = unlockVault(PASSPHRASE).then((result) => order.push(`sblocco ${result}`));
+    // Nel frattempo la coda resta (il browser chiederebbe conferma prima di ricaricare).
+    expect(lockedQueueSize()).toBe(1);
+    await settleBeforeReload().then(() => order.push('pronto'));
+    await unlocked;
+    expect(order[0]).toBe('sblocco ok');
+    expect(lockedQueueSize()).toBe(0);
+    expect(hasUnsavedChanges()).toBe(false);
+    await lockVault();
+    expect(await unlockVault(PASSPHRASE)).toBe('ok');
+    expect(notes().map((n) => n.text)).toEqual(['Trattenuta prima dell’aggiornamento']);
   });
 
   it('una modifica trattenuta più vecchia di quella salvata altrove diventa una nota nuova', async () => {

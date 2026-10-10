@@ -31,6 +31,11 @@ export default tseslint.config(
     },
   },
   {
+    // Il service worker non ha window né document.
+    files: ['src/sw/**'],
+    languageOptions: { globals: { ...globals.serviceworker } },
+  },
+  {
     files: ['*.config.{js,ts}', 'e2e/**'],
     languageOptions: { globals: { ...globals.node } },
   },

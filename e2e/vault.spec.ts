@@ -3,10 +3,12 @@ import {
   DB_NAME,
   LEGACY_DB_NAME,
   openUnlocked,
+  reloadUnlocked,
   setupVault,
   TEST_PASSPHRASE,
   unlockVault,
   waitForPendingSaves,
+  waitForServiceWorker,
 } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
@@ -152,18 +154,29 @@ test('le note del vecchio archivio in chiaro si cifrano alla creazione della pas
   expect(await rawDump(page)).not.toContain('cifratura');
 });
 
-test('il blocco in una scheda blocca anche le altre', async ({ page, context }) => {
-  await openUnlocked(page);
-  const other = await context.newPage();
-  await openUnlocked(other);
-  await expect(editor(other)).toContainText('Nota di esempio');
+// Tra schede con il service worker attivo (come per chi usa l'app): entrambe controllate.
+test.describe('con il service worker attivo', () => {
+  test.use({ serviceWorkers: 'allow' });
+  test.afterEach(async ({ page }) => waitForServiceWorker(page));
 
-  await lockButton(page).click();
-  await expect(lockedHeading(page)).toBeVisible();
-  await expect(lockedHeading(other)).toBeVisible();
-  await expect(other.getByText('Note bloccate da un’altra scheda.')).toBeVisible();
-  expect(await other.evaluate(() => document.body.innerText)).not.toContain('Nota di esempio');
-  await other.close();
+  test('il blocco in una scheda blocca anche le altre', async ({ page, context }) => {
+    await openUnlocked(page);
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await reloadUnlocked(page);
+    const other = await context.newPage();
+    await openUnlocked(other);
+    await expect(editor(other)).toContainText('Nota di esempio');
+    expect(await other.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+
+    await lockButton(page).click();
+    await expect(lockedHeading(page)).toBeVisible();
+    await expect(lockedHeading(other)).toBeVisible();
+    await expect(other.getByText('Note bloccate da un’altra scheda.')).toBeVisible();
+    expect(await other.evaluate(() => document.body.innerText)).not.toContain('Nota di esempio');
+    await other.close();
+  });
 });
 
 test('dopo il tempo di inattività la scheda si blocca da sola', async ({ page }) => {

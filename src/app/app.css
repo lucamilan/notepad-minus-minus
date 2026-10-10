@@ -1,4 +1,4 @@
-/* Layout: barra · avviso · area di lavoro (schede + nota) · barra di stato; la raccolta arriva in F6. */
+/* Layout: barra · avviso · area di lavoro (raccolta, schede, nota) · barra di stato. */
 :root {
   --bg: #e9ecf0;
   --bar: #ffffff;
@@ -867,5 +867,38 @@ button {
       transform: translateX(24px);
       opacity: 0.6;
     }
+  }
+}
+
+/* Avviso di aggiornamento (PWA): non modale, in basso, sopra la barra di stato */
+.update-region {
+  position: fixed;
+  right: 16px;
+  bottom: 40px;
+  left: auto;
+  max-width: calc(100vw - 32px);
+  z-index: 30;
+}
+
+.update-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  background: var(--paper);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  font-size: 0.86rem;
+}
+
+.update-banner .link-button {
+  font-size: 0.82rem;
+}
+
+@media (max-width: 480px) {
+  .update-region {
+    left: 16px;
   }
 }
