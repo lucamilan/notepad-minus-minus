@@ -76,7 +76,7 @@ Sotto-agenti: per ogni fase uno implementa e uno fa revisione di codice e sicure
   - asset con hash nel nome.
 - `tsconfig.json` strict, con `noUncheckedIndexedAccess` ed `exactOptionalPropertyTypes`.
 - `index.html`:
-  - meta CSP con `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types notepad-md dompurify`;
+  - meta CSP con `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types notepad-md dompurify` (da F5: `trusted-types dompurify`, l'anteprima non usa una policy propria);
   - meta `referrer` impostato a `no-referrer`;
   - niente risorse esterne.
 - `src/main.tsx` + `src/app/App.tsx`: schermata segnaposto "Notepad−− v2 in costruzione", resa senza `innerHTML`.

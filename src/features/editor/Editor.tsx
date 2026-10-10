@@ -8,22 +8,45 @@ import {
   keymap,
   lineNumbers,
 } from '@codemirror/view';
-import { useLayoutEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { editorTheme } from './editorTheme';
 
 interface EditorProps {
   initialText: string;
   label: string;
   onChange?: (text: string) => void;
-  /** L'editor prende il focus appena montato. */
-  autoFocus?: boolean | undefined;
-  initialSelection?: { anchor: number; head: number } | undefined;
+  /**
+   * Richiesta di prendere il focus (ed eventualmente selezionare): vale al montaggio e ogni
+   * volta che arriva un oggetto nuovo, per esempio dal doppio clic sull'anteprima.
+   */
+  focusRequest?: EditorFocus | undefined;
+}
+
+export interface EditorFocus {
+  selection?: { anchor: number; head: number } | undefined;
+}
+
+function applyFocus(view: EditorView, request: EditorFocus): void {
+  const { selection } = request;
+  if (selection) {
+    const length = view.state.doc.length;
+    view.dispatch({
+      selection: EditorSelection.single(
+        Math.min(selection.anchor, length),
+        Math.min(selection.head, length),
+      ),
+      scrollIntoView: true,
+    });
+  }
+  view.focus();
 }
 
 // CodeMirror vive in uno shadow root: lì i suoi stili vanno in un foglio costruito
 // (adoptedStyleSheets) invece che in un <style> inline, che la CSP (style-src 'self') bloccherebbe.
-export function Editor({ initialText, label, onChange, autoFocus, initialSelection }: EditorProps) {
+export function Editor({ initialText, label, onChange, focusRequest }: EditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const handledRef = useRef<EditorFocus | undefined>(undefined);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -36,12 +59,6 @@ export function Editor({ initialText, label, onChange, autoFocus, initialSelecti
 
     const view = new EditorView({
       doc: initialText,
-      ...(initialSelection && {
-        selection: EditorSelection.single(
-          Math.min(initialSelection.anchor, initialText.length),
-          Math.min(initialSelection.head, initialText.length),
-        ),
-      }),
       root: shadow,
       parent: shadow,
       extensions: [
@@ -59,12 +76,25 @@ export function Editor({ initialText, label, onChange, autoFocus, initialSelecti
         editorTheme,
       ],
     });
+    viewRef.current = view;
     onChangeRef.current?.(view.state.doc.toString());
-    if (autoFocus) view.focus();
+    if (focusRequest) applyFocus(view, focusRequest);
+    handledRef.current = focusRequest;
 
-    return () => view.destroy();
+    return () => {
+      viewRef.current = null;
+      view.destroy();
+    };
     // L'editor si crea una sola volta: da lì in poi il testo lo gestisce CodeMirror.
   }, []);
+
+  // Richieste successive al montaggio (l'editor era già aperto, magari nascosto).
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !focusRequest || focusRequest === handledRef.current) return;
+    handledRef.current = focusRequest;
+    applyFocus(view, focusRequest);
+  }, [focusRequest]);
 
   return <div class="editor-host" ref={hostRef} />;
 }

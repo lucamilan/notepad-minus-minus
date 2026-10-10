@@ -1,5 +1,6 @@
 import type { RefObject } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { ViewModeSwitch } from '../features/preview/ViewModeSwitch';
 import { DeviceIcon, MoreIcon } from './icons';
 
 interface AppBarProps {
@@ -74,6 +75,7 @@ export function AppBar({ menuButtonRef, onOpenSettings }: AppBarProps) {
         <span>Solo su questo dispositivo</span>
       </span>
       <span class="spacer" />
+      <ViewModeSwitch />
       <div
         class="menu-wrap"
         ref={wrapRef}

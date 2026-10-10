@@ -1,9 +1,11 @@
-import { signal, useComputed } from '@preact/signals';
+import { batch, signal, useComputed } from '@preact/signals';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Editor } from '../features/editor/Editor';
+import { Editor, type EditorFocus } from '../features/editor/Editor';
 import { noteTitle, sortNotes, type Note } from '../features/notes/note';
 import { editNote, flushSaves, saveStatus, type SaveStatus } from '../features/notes/autosave';
 import { notesState } from '../features/notes/store';
+import { Preview } from '../features/preview/Preview';
+import { nextViewMode, viewMode } from '../features/preview/viewMode';
 import { SettingsDrawer } from '../features/settings/SettingsDrawer';
 import {
   actionError,
@@ -105,9 +107,16 @@ export function App() {
   useEffect(() => {
     if (settingsOpen) return undefined;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.metaKey || notesState.value.status !== 'ready') return;
-      const altOnly = e.altKey && !e.ctrlKey && !e.shiftKey;
+      if (e.defaultPrevented) return;
       const letter = shortcutLetter(e);
+      // Ctrl+E (Cmd+E su macOS): Modifica → Affiancata → Anteprima.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && letter === 'e') {
+        e.preventDefault();
+        if (!e.repeat) viewMode.value = nextViewMode(viewMode.value);
+        return;
+      }
+      if (e.metaKey || notesState.value.status !== 'ready') return;
+      const altOnly = e.altKey && !e.ctrlKey && !e.shiftKey;
       if (altOnly && letter === 'n') {
         // Tenendo premuto Alt+N la ripetizione del tasto non crea una nota dopo l'altra.
         if (e.repeat) {
@@ -189,28 +198,85 @@ function Workspace() {
   );
 }
 
+/** Offset del primo carattere della riga `line` (0 = prima riga). */
+function lineStart(text: string, line: number): number {
+  let offset = 0;
+  for (let i = 0; i < line; i++) {
+    const next = text.indexOf('\n', offset);
+    if (next === -1) return text.length;
+    offset = next + 1;
+  }
+  return offset;
+}
+
 function NotePanel({ note }: { note: Note }) {
-  // La richiesta di focus vale solo per l'editor che si monta adesso, poi si consuma.
-  const request = editorFocusRequest.peek();
-  const focus = request?.id === note.id ? request : undefined;
+  const mode = viewMode.value;
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Le richieste di focus per questa nota: al montaggio (Alt+N, cambio scheda) e dopo
+  // (doppio clic sull'anteprima). In sola anteprima l'editor è nascosto: va all'anteprima.
+  const request = editorFocusRequest.value;
+  const forThisNote = request?.id === note.id ? request : undefined;
+  const editorFocus: EditorFocus | undefined =
+    forThisNote && mode !== 'preview' ? forThisNote : undefined;
+  const [previewFocus, setPreviewFocus] = useState<number | undefined>(() =>
+    forThisNote && mode === 'preview' ? 1 : undefined,
+  );
+
+  // Consumata dopo che l'editor (figlio, effetti prima del genitore) l'ha applicata.
   useEffect(() => {
-    if (editorFocusRequest.peek()?.id === note.id) editorFocusRequest.value = null;
-  }, [note.id]);
+    if (!forThisNote) return;
+    if (mode === 'preview') setPreviewFocus((n) => (n ?? 0) + 1);
+    editorFocusRequest.value = null;
+  }, [forThisNote]);
+
+  // Cambiando modalità con Ctrl+E il focus resta nella nota: sull'editor se è visibile,
+  // altrimenti sull'anteprima. Con un clic sui pulsanti il focus resta sul pulsante.
+  const previousMode = useRef(mode);
+  useEffect(() => {
+    if (previousMode.current === mode) return;
+    previousMode.current = mode;
+    // Un vecchio gettone non deve rubare il focus quando l'anteprima si rimonta.
+    setPreviewFocus(undefined);
+    const active = document.activeElement;
+    const focusWasHere = active === document.body || panelRef.current?.contains(active);
+    if (!focusWasHere) return;
+    if (mode === 'preview') setPreviewFocus((n) => (n ?? 0) + 1);
+    else editorFocusRequest.value = { id: note.id };
+  }, [mode]);
+
+  const editAt = (line: number | null) =>
+    batch(() => {
+      if (viewMode.value === 'preview') viewMode.value = 'edit';
+      editorFocusRequest.value =
+        line === null
+          ? { id: note.id }
+          : {
+              id: note.id,
+              selection: { anchor: lineStart(note.text, line), head: lineStart(note.text, line) },
+            };
+    });
 
   return (
     <div
+      ref={panelRef}
       class="note-panel"
+      data-mode={mode}
       role="tabpanel"
       id={NOTE_PANEL_ID}
       aria-labelledby={tabElementId(note.id)}
     >
-      <Editor
-        initialText={note.text}
-        label="Testo della nota"
-        autoFocus={focus !== undefined}
-        initialSelection={focus?.selection}
-        onChange={(text) => editNote(note.id, text)}
-      />
+      {/* L'editor resta montato anche quando è nascosto: niente perdita di annullamenti. */}
+      <div class="note-editor" hidden={mode === 'preview'}>
+        <Editor
+          initialText={note.text}
+          label="Testo della nota"
+          focusRequest={editorFocus}
+          onChange={(text) => editNote(note.id, text)}
+        />
+      </div>
+      {mode !== 'edit' && (
+        <Preview text={note.text} onRequestEdit={editAt} focusToken={previewFocus} />
+      )}
     </div>
   );
 }

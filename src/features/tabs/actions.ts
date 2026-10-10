@@ -2,6 +2,7 @@ import { batch, signal } from '@preact/signals';
 import { discardPendingSave } from '../notes/autosave';
 import { createNote, NEW_NOTE_TEXT, NEW_NOTE_TITLE_RANGE } from '../notes/note';
 import { addNote, getRepository, notesState, removeNote } from '../notes/store';
+import { ensureEditorVisible } from '../preview/viewMode';
 import {
   hiddenTabIds,
   TABS_META_KEY,
@@ -85,6 +86,7 @@ export async function createNoteInNewTab(now: number = Date.now()): Promise<void
   // non perde i primi caratteri. Se il salvataggio fallisce, la creazione si annulla.
   batch(() => {
     actionError.value = null;
+    ensureEditorVisible();
     addNote(note);
     editorFocusRequest.value = { id: note.id, selection: { ...NEW_NOTE_TITLE_RANGE } };
     openTab(note.id);
