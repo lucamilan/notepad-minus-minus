@@ -1,5 +1,5 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { EditorSelection } from '@codemirror/state';
+import { EditorSelection, type Extension } from '@codemirror/state';
 import {
   drawSelection,
   EditorView,
@@ -20,6 +20,8 @@ interface EditorProps {
    * volta che arriva un oggetto nuovo, per esempio dal doppio clic sull'anteprima.
    */
   focusRequest?: EditorFocus | undefined;
+  /** Estensioni aggiuntive, lette solo alla creazione (es. suggerimenti dei tag). */
+  extensions?: readonly Extension[] | undefined;
 }
 
 export interface EditorFocus {
@@ -43,7 +45,7 @@ function applyFocus(view: EditorView, request: EditorFocus): void {
 
 // CodeMirror vive in uno shadow root: lì i suoi stili vanno in un foglio costruito
 // (adoptedStyleSheets) invece che in un <style> inline, che la CSP (style-src 'self') bloccherebbe.
-export function Editor({ initialText, label, onChange, focusRequest }: EditorProps) {
+export function Editor({ initialText, label, onChange, focusRequest, extensions }: EditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const handledRef = useRef<EditorFocus | undefined>(undefined);
@@ -74,6 +76,7 @@ export function Editor({ initialText, label, onChange, focusRequest }: EditorPro
           if (update.docChanged) onChangeRef.current?.(update.state.doc.toString());
         }),
         editorTheme,
+        ...(extensions ?? []),
       ],
     });
     viewRef.current = view;

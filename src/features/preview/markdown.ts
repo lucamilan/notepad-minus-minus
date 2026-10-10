@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
 import type Token from 'markdown-it/lib/token.mjs';
+import { categoryOf, TAG_PATTERN } from '../collection/tags';
 
 /**
  * Unico punto dell'app che trasforma testo in HTML. Due difese indipendenti:
@@ -70,6 +71,7 @@ md.core.ruler.push('notepad_blocks', (state) => {
     if (token.type === 'inline') {
       markTask(tokens, index, state.Token);
       unlinkUnsafe(token);
+      markTags(token, state.Token);
     }
   });
 });
@@ -105,6 +107,47 @@ function alignToClass(token: Token): void {
   const align = /text-align:(left|center|right)/.exec(style)?.[1];
   token.attrs = (token.attrs ?? []).filter(([name]) => name !== 'style');
   if (align) token.attrJoin('class', `align-${align}`);
+}
+
+md.renderer.rules['note_tag'] = (tokens, idx) => {
+  const tag = tokens[idx]?.content ?? '';
+  const escaped = md.utils.escapeHtml(tag);
+  return `<span class="tag" data-c="${categoryOf(tag)}" data-tag="${escaped}">#${escaped}</span>`;
+};
+
+/** I tag nel testo (fuori da codice e link) diventano etichette cliccabili. */
+function markTags(inline: Token, TokenClass: typeof Token): void {
+  const children = inline.children;
+  if (!children) return;
+  const result: Token[] = [];
+  let linkDepth = 0;
+  for (const child of children) {
+    if (child.type === 'link_open') linkDepth++;
+    if (child.type === 'link_close') linkDepth--;
+    if (child.type !== 'text' || linkDepth > 0 || !child.content.includes('#')) {
+      result.push(child);
+      continue;
+    }
+    let last = 0;
+    for (const match of child.content.matchAll(TAG_PATTERN)) {
+      const start = (match.index ?? 0) + (match[1]?.length ?? 0);
+      const text = new TokenClass('text', '', 0);
+      text.content = child.content.slice(last, start);
+      if (text.content) result.push(text);
+      const tag = new TokenClass('note_tag', '', 0);
+      tag.content = (match[2] ?? '').toLowerCase();
+      result.push(tag);
+      last = start + 1 + (match[2]?.length ?? 0);
+    }
+    if (last === 0) {
+      result.push(child);
+      continue;
+    }
+    const rest = new TokenClass('text', '', 0);
+    rest.content = child.content.slice(last);
+    if (rest.content) result.push(rest);
+  }
+  inline.children = result;
 }
 
 function markTask(tokens: Token[], index: number, TokenClass: typeof Token): void {
@@ -158,7 +201,9 @@ const ALLOWED_ATTR = [
   'alt',
   'checked',
   'class',
+  'data-c',
   'data-line',
+  'data-tag',
   'disabled',
   'href',
   'rel',

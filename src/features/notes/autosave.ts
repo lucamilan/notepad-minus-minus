@@ -12,6 +12,8 @@ export type SaveStatus =
   | { state: 'saved'; at: number | null } // at null: nulla modificato in questa sessione
   | { state: 'pending' }
   | { state: 'saving' }
+  /** Restano solo modifiche trattenute: si aspetta la scelta tra questa e un'altra scheda. */
+  | { state: 'held' }
   | { state: 'error'; message: string };
 
 export const SAVE_DELAY_MS = 500;
@@ -21,11 +23,32 @@ export const RETRY_DELAY_MS = 5000;
 export const saveStatus = signal<SaveStatus>({ state: 'saved', at: null });
 
 const pending = new Map<string, Note>();
-/** Note la cui creazione è stata annullata: non vanno mai scritte (né lasciate) nell'archivio. */
+/** Note eliminate o la cui creazione è stata annullata: non vanno scritte (né lasciate). */
 const discarded = new Set<string>();
+/**
+ * Note cambiate in un'altra scheda mentre qui avevano modifiche: restano in coda senza
+ * scriversi finché l'utente non sceglie quale versione tenere (crossTab.ts).
+ */
+const held = new Set<string>();
+/** Id delle note nel salvataggio in corso. */
+const writing = new Set<string>();
 let timer: ReturnType<typeof setTimeout> | undefined;
 let running: Promise<void> | null = null;
 let lastSavedAt: number | null = null;
+let savedListener: ((notes: readonly Note[]) => void) | undefined;
+
+/** Chi vuole sapere quali note sono appena finite nell'archivio (avviso tra schede). */
+export function setSavedListener(listener: ((notes: readonly Note[]) => void) | undefined): void {
+  savedListener = listener;
+}
+
+/** Stato coerente con la coda, se non c'è una scrittura in corso o un errore da mostrare. */
+function settleStatus(): void {
+  if (running !== null || saveStatus.value.state === 'error') return;
+  if (pending.size === 0) saveStatus.value = { state: 'saved', at: lastSavedAt };
+  else if ([...pending.keys()].every((id) => held.has(id))) saveStatus.value = { state: 'held' };
+  else saveStatus.value = { state: 'pending' };
+}
 
 /** Aggiorna il testo della nota in memoria e ne programma il salvataggio. */
 export function editNote(id: string, text: string): void {
@@ -36,22 +59,53 @@ export function editNote(id: string, text: string): void {
 export function scheduleSave(note: Note): void {
   pending.set(note.id, note);
   // Un errore resta visibile finché un salvataggio non riesce davvero.
-  const { state } = saveStatus.value;
-  if (state === 'saved') saveStatus.value = { state: 'pending' };
+  settleStatus();
   clearTimeout(timer);
   timer = setTimeout(() => void flushSaves(), SAVE_DELAY_MS);
 }
 
-/** Una nota la cui creazione è stata annullata: esce dalla coda e non verrà più scritta. */
+/** Nota eliminata o creazione annullata: esce dalla coda e non verrà più scritta. */
 export function discardPendingSave(id: string): void {
   discarded.add(id);
+  dropPendingSave(id);
+}
+
+/** La nota torna nell'archivio da un'altra scheda: si può di nuovo salvare. */
+export function allowSaving(id: string): void {
+  discarded.delete(id);
+}
+
+/** La nota ha modifiche in coda o in scrittura? */
+export function isPendingSave(id: string): boolean {
+  return pending.has(id) || writing.has(id);
+}
+
+/** Scarta le modifiche in coda di una nota (si è scelto di tenere la versione dell'archivio). */
+export function dropPendingSave(id: string): void {
   pending.delete(id);
-  // Se era l'unica modifica in coda, lo stato non deve restare su "Modifiche non salvate".
-  if (pending.size === 0 && running === null && saveStatus.value.state === 'pending') {
+  if (pending.size === 0) {
     clearTimeout(timer);
     timer = undefined;
-    saveStatus.value = { state: 'saved', at: lastSavedAt };
   }
+  settleStatus();
+}
+
+/** Trattiene le modifiche della nota finché non si sceglie la versione (crossTab.ts). */
+export function holdSaves(id: string): void {
+  held.add(id);
+}
+
+/** Fine dell'attesa: le modifiche ancora in coda partono con il prossimo salvataggio. */
+export function releaseSaves(id: string): void {
+  if (!held.delete(id)) return;
+  if (pending.has(id)) scheduleSave(pending.get(id) as Note);
+  else settleStatus();
+}
+
+/** Annulla un discardPendingSave (eliminazione fallita): la nota torna a salvarsi. */
+export function restorePendingSave(note: Note): void {
+  discarded.delete(note.id);
+  scheduleSave(note);
 }
 
 export function hasUnsavedChanges(): boolean {
@@ -66,15 +120,25 @@ export async function flushSaves(): Promise<void> {
   while (running) await running;
   if (pending.size === 0) return;
 
-  const batch = [...pending.values()].filter((note) => !discarded.has(note.id));
-  pending.clear();
-  if (batch.length === 0) return;
+  const batch: Note[] = [];
+  for (const [id, note] of pending) {
+    if (held.has(id)) continue;
+    pending.delete(id);
+    if (!discarded.has(id)) batch.push(note);
+  }
+  if (batch.length === 0) {
+    settleStatus();
+    return;
+  }
   saveStatus.value = { state: 'saving' };
+  for (const note of batch) writing.add(note.id);
   running = write(batch);
   try {
     await running;
   } finally {
     running = null;
+    writing.clear();
+    settleStatus();
   }
 }
 
@@ -82,12 +146,12 @@ async function write(batch: Note[]): Promise<void> {
   try {
     const repo = getRepository();
     await repo.putMany(batch);
-    // Creazione annullata mentre la nota era già in scrittura: la si toglie di nuovo, così non
-    // ricompare al prossimo avvio dopo che l'utente ha letto "la nota non è stata creata".
+    // Creazione annullata (o nota eliminata) mentre era già in scrittura: la si toglie di
+    // nuovo, così non ricompare al prossimo avvio.
     for (const note of batch) if (discarded.has(note.id)) await repo.delete(note.id);
     lastSavedAt = Date.now();
-    saveStatus.value =
-      pending.size > 0 ? { state: 'pending' } : { state: 'saved', at: lastSavedAt };
+    savedListener?.(batch.filter((note) => !discarded.has(note.id)));
+    saveStatus.value = { state: 'saved', at: lastSavedAt };
   } catch (error) {
     console.error(error);
     // Si rimettono in coda, senza scavalcare versioni più recenti arrivate nel frattempo.
@@ -151,6 +215,8 @@ export function resetAutosaveForTests(): void {
   timer = undefined;
   pending.clear();
   discarded.clear();
+  held.clear();
+  writing.clear();
   running = null;
   lastSavedAt = null;
   saveStatus.value = { state: 'saved', at: null };

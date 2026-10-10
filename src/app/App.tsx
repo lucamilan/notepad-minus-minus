@@ -1,5 +1,21 @@
 import { batch, signal, useComputed } from '@preact/signals';
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { applyFilter } from '../features/collection/actions';
+import { Collection } from '../features/collection/Collection';
+import { DeleteDialog, NoteBar } from '../features/collection/NoteBar';
+import {
+  deleteRequest,
+  narrowScreen,
+  showSidebar,
+  sidebarOverlayOpen,
+  sidebarVisible,
+  toggleSidebar,
+} from '../features/collection/state';
+import { tagCompletion } from '../features/collection/tagCompletion';
+import { tagCounts } from '../features/collection/tags';
+import { noteRevisions } from '../features/notes/crossTab';
+import { SearchDialog } from '../features/search/SearchDialog';
+import { openSearch, searchRequest } from '../features/search/state';
 import { Editor, type EditorFocus } from '../features/editor/Editor';
 import { noteTitle, sortNotes, type Note } from '../features/notes/note';
 import { editNote, flushSaves, saveStatus, type SaveStatus } from '../features/notes/autosave';
@@ -55,6 +71,8 @@ function saveStatusText(status: SaveStatus): string {
       return 'Modifiche non salvate';
     case 'saving':
       return 'Salvataggio…';
+    case 'held':
+      return 'In attesa: scegli quale versione tenere';
     case 'error':
       return status.message;
   }
@@ -103,12 +121,39 @@ export function App() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // Un dialogo modale aperto (impostazioni, ricerca, eliminazione) rende inerte il resto.
+  // Conta solo ciò che è davvero sullo schermo: se l'archivio si chiude mentre la ricerca è
+  // aperta, il messaggio d'errore non deve restare inerte.
+  const state = notesState.value;
+  const ready = state.status === 'ready';
+  const deleting = deleteRequest.value;
+  const noteToDelete = ready ? state.notes.find((note) => note.id === deleting) : undefined;
+  const search = ready ? searchRequest.value : null;
+  const modalOpen = settingsOpen || search !== null || noteToDelete !== undefined;
+
   // Scorciatoie delle schede: solo con le note pronte e nessun pannello modale aperto.
   useEffect(() => {
-    if (settingsOpen) return undefined;
+    if (modalOpen) return undefined;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       const letter = shortcutLetter(e);
+      const ctrlOnly = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+      // Ctrl+K: ricerca globale. Ctrl+\: mostra o nasconde la raccolta.
+      if (ctrlOnly && letter === 'k' && notesState.value.status === 'ready') {
+        e.preventDefault();
+        if (!e.repeat) openSearch();
+        return;
+      }
+      if (ctrlOnly && (e.key === '\\' || e.code === 'Backslash')) {
+        e.preventDefault();
+        if (!e.repeat) toggleSidebar();
+        return;
+      }
+      if (e.key === 'Escape' && narrowScreen.value && sidebarOverlayOpen.value) {
+        e.preventDefault();
+        sidebarOverlayOpen.value = false;
+        return;
+      }
       // Ctrl+E (Cmd+E su macOS): Modifica → Affiancata → Anteprima.
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && letter === 'e') {
         e.preventDefault();
@@ -136,13 +181,13 @@ export function App() {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [settingsOpen]);
+  }, [modalOpen]);
 
   return (
     <div class="app">
       {/* Con un pannello modale aperto il resto è inerte in modo esplicito: showModal() da solo
           non esclude sempre dal Tab il contenuto nello shadow root dell'editor (Chromium). */}
-      <div class="app-content" inert={settingsOpen}>
+      <div class="app-content" inert={modalOpen}>
         <AppBar menuButtonRef={menuButtonRef} onOpenSettings={openSettings} />
         <p class="notice" role="note">
           <InfoIcon />
@@ -158,6 +203,8 @@ export function App() {
       </div>
       <SaveAnnouncer />
       {settingsOpen && <SettingsDrawer onClose={closeSettings} />}
+      {search && ready && <SearchDialog notes={state.notes} initialQuery={search.query} />}
+      {noteToDelete && <DeleteDialog note={noteToDelete} />}
     </div>
   );
 }
@@ -178,24 +225,68 @@ function Workspace() {
   const unreadable = state.unreadable.length;
   const error = actionError.value;
   const note = activeNote();
+  const revision = note ? (noteRevisions.value.get(note.id) ?? 0) : 0;
+  const overlay = narrowScreen.value;
+  const showCollection = sidebarVisible();
   return (
-    <>
-      {unreadable > 0 && (
-        <p class="workspace-warning" role="status">
-          {unreadable === 1
-            ? '1 nota non si può leggere: è stata lasciata intatta nell’archivio.'
-            : `${unreadable} note non si possono leggere: sono state lasciate intatte nell’archivio.`}
-        </p>
+    <div class="workspace-body" data-collection={showCollection ? 'shown' : 'hidden'}>
+      <CollectionFocus shown={showCollection} overlay={overlay} />
+      {showCollection && <Collection notes={state.notes} />}
+      {showCollection && overlay && (
+        <div
+          class="collection-scrim"
+          aria-hidden="true"
+          onClick={() => (sidebarOverlayOpen.value = false)}
+        />
       )}
-      {error && (
-        <p class="workspace-warning" role="alert">
-          {error}
-        </p>
-      )}
-      <TabBar notes={state.notes} />
-      {note ? <NotePanel key={note.id} note={note} /> : <NoOpenNotes notes={state.notes} />}
-    </>
+      {/* Su schermi stretti la raccolta copre le note: sotto, niente Tab né lettore di schermo. */}
+      <div class="workspace-main" inert={showCollection && overlay}>
+        {unreadable > 0 && (
+          <p class="workspace-warning" role="status">
+            {unreadable === 1
+              ? '1 nota non si può leggere: è stata lasciata intatta nell’archivio.'
+              : `${unreadable} note non si possono leggere: sono state lasciate intatte nell’archivio.`}
+          </p>
+        )}
+        {error && (
+          <p class="workspace-warning" role="alert">
+            {error}
+          </p>
+        )}
+        <TabBar notes={state.notes} />
+        {note && <NoteBar note={note} />}
+        {/* La revisione cambia quando si carica la versione di un'altra scheda: editor nuovo. */}
+        {note ? (
+          <NotePanel key={`${note.id}:${revision}`} note={note} />
+        ) : (
+          <NoOpenNotes notes={state.notes} />
+        )}
+      </div>
+    </div>
   );
+}
+
+/**
+ * Focus della raccolta: aperta come pannello sopra le note, il focus entra nel pannello;
+ * chiusa (Esc, clic fuori, Ctrl+) con il focus dentro, torna sul pulsante "Raccolta".
+ */
+function CollectionFocus({ shown, overlay }: { shown: boolean; overlay: boolean }) {
+  const wasShown = useRef(shown);
+  useEffect(() => {
+    if (wasShown.current === shown) return;
+    wasShown.current = shown;
+    if (shown && overlay) {
+      document.querySelector<HTMLElement>('.collection .find')?.focus();
+    } else if (!shown) {
+      // Dopo il disegno: se si è aperta una nota dalla raccolta, il focus è già nel suo testo.
+      requestAnimationFrame(() => {
+        if (document.activeElement === document.body || !document.activeElement) {
+          document.querySelector<HTMLElement>('.sidebar-toggle')?.focus();
+        }
+      });
+    }
+  }, [shown, overlay]);
+  return null;
 }
 
 /** Offset del primo carattere della riga `line` (0 = prima riga). */
@@ -212,6 +303,16 @@ function lineStart(text: string, line: number): number {
 function NotePanel({ note }: { note: Note }) {
   const mode = viewMode.value;
   const panelRef = useRef<HTMLDivElement>(null);
+  // I conteggi si leggono al momento del suggerimento: le note cambiano mentre si scrive.
+  const extensions = useMemo(
+    () => [
+      tagCompletion(() => {
+        const state = notesState.peek();
+        return tagCounts(state.status === 'ready' ? state.notes : []);
+      }),
+    ],
+    [],
+  );
   // Le richieste di focus per questa nota: al montaggio (Alt+N, cambio scheda) e dopo
   // (doppio clic sull'anteprima). In sola anteprima l'editor è nascosto: va all'anteprima.
   const request = editorFocusRequest.value;
@@ -268,6 +369,7 @@ function NotePanel({ note }: { note: Note }) {
       {/* L'editor resta montato anche quando è nascosto: niente perdita di annullamenti. */}
       <div class="note-editor" hidden={mode === 'preview'}>
         <Editor
+          extensions={extensions}
           initialText={note.text}
           label="Testo della nota"
           focusRequest={editorFocus}
@@ -275,7 +377,15 @@ function NotePanel({ note }: { note: Note }) {
         />
       </div>
       {mode !== 'edit' && (
-        <Preview text={note.text} onRequestEdit={editAt} focusToken={previewFocus} />
+        <Preview
+          text={note.text}
+          onRequestEdit={editAt}
+          onTagClick={(tag) => {
+            applyFilter({ view: 'all', tags: [tag] });
+            showSidebar();
+          }}
+          focusToken={previewFocus}
+        />
       )}
     </div>
   );

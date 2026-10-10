@@ -14,6 +14,14 @@
   --ok: #24764a;
   --warn: #a83d17;
   --warn-soft: #f7e0d6;
+  --side: #f3f5f7;
+  --mark: #f8dfa0;
+  --danger: #b23a2a;
+  --on-danger: #ffffff;
+  --c-cliente: #2f6497;
+  --c-progetto: #1d7a70;
+  --c-tipo: #8f5300;
+  --c-altri: #6b7480;
   --active-line: rgba(143, 83, 0, 0.05);
   --selection: rgba(143, 83, 0, 0.18);
   --scrim: rgba(18, 24, 32, 0.42);
@@ -40,6 +48,14 @@
     --ok: #5cc48a;
     --warn: #ef8a62;
     --warn-soft: #3c1f14;
+    --side: #13181d;
+    --mark: #5a4519;
+    --danger: #e0614c;
+    --on-danger: #1a0905;
+    --c-cliente: #7fb0e3;
+    --c-progetto: #5cc2b8;
+    --c-tipo: #e3a548;
+    --c-altri: #97a1ae;
     --active-line: rgba(227, 165, 72, 0.06);
     --selection: rgba(227, 165, 72, 0.25);
     --scrim: rgba(0, 0, 0, 0.55);
@@ -63,6 +79,14 @@
   --ok: #5cc48a;
   --warn: #ef8a62;
   --warn-soft: #3c1f14;
+  --side: #13181d;
+  --mark: #5a4519;
+  --danger: #e0614c;
+  --on-danger: #1a0905;
+  --c-cliente: #7fb0e3;
+  --c-progetto: #5cc2b8;
+  --c-tipo: #e3a548;
+  --c-altri: #97a1ae;
   --active-line: rgba(227, 165, 72, 0.06);
   --selection: rgba(227, 165, 72, 0.25);
   --scrim: rgba(0, 0, 0, 0.55);
@@ -664,6 +688,7 @@ button {
 }
 
 .save-state[data-state='pending'],
+.save-state[data-state='held'],
 .save-state[data-state='error'] {
   color: var(--warn);
 }

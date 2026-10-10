@@ -172,3 +172,18 @@ describe('modalità di visualizzazione', () => {
     expect(loadViewMode(undefined)).toBe('split');
   });
 });
+
+describe('anteprima Markdown: tag', () => {
+  it('i tag diventano etichette, ma non nei link né nel codice', () => {
+    const host = render('Vedi #cliente/Acme e #personale\n\n[#nonTag](https://x.it) `#codice`');
+    const tags = [...host.querySelectorAll('.tag')];
+    expect(
+      tags.map((t) => [t.getAttribute('data-tag'), t.getAttribute('data-c'), t.textContent]),
+    ).toEqual([
+      ['cliente/acme', 'cliente', '#cliente/acme'],
+      ['personale', 'altri', '#personale'],
+    ]);
+    expect(host.textContent).toContain('Vedi');
+    expectInert(host);
+  });
+});

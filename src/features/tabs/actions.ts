@@ -1,4 +1,6 @@
 import { batch, signal } from '@preact/signals';
+import { collectionFilter } from '../collection/state';
+import { matchesFilter } from '../collection/views';
 import { discardPendingSave } from '../notes/autosave';
 import { createNote, NEW_NOTE_TEXT, NEW_NOTE_TITLE_RANGE } from '../notes/note';
 import { addNote, getRepository, notesState, removeNote } from '../notes/store';
@@ -81,13 +83,28 @@ export function cycleTabKeepingEditorFocus(delta: number): void {
  */
 export async function createNoteInNewTab(now: number = Date.now()): Promise<void> {
   if (notesState.value.status !== 'ready') return;
-  const note = createNote(NEW_NOTE_TEXT, now);
+  // Con un filtro attivo la nota nasce già con quei tag (e fissata, nella vista Fissate).
+  const filter = collectionFilter.value;
+  const tagLine = filter.tags.map((tag) => `#${tag}`).join(' ');
+  const note = {
+    ...createNote(
+      tagLine
+        ? `${NEW_NOTE_TEXT}${tagLine}
+`
+        : NEW_NOTE_TEXT,
+      now,
+    ),
+    pinned: filter.view === 'pinned',
+  };
   // La scheda si apre prima che l'archivio confermi: chi preme Alt+N e scrive subito
   // non perde i primi caratteri. Se il salvataggio fallisce, la creazione si annulla.
   batch(() => {
     actionError.value = null;
     ensureEditorVisible();
     addNote(note);
+    // Una vista che non la mostrerebbe (es. Attività aperte) lascia il posto a Tutte.
+    if (!matchesFilter(note, filter, now))
+      collectionFilter.value = { view: 'all', tags: filter.tags };
     editorFocusRequest.value = { id: note.id, selection: { ...NEW_NOTE_TITLE_RANGE } };
     openTab(note.id);
   });
@@ -97,6 +114,7 @@ export async function createNoteInNewTab(now: number = Date.now()): Promise<void
     console.error(error);
     if (notesState.value.status !== 'ready') return; // archivio chiuso: c'è già il messaggio
     batch(() => {
+      collectionFilter.value = filter;
       closeTab(note.id);
       removeNote(note.id);
       discardPendingSave(note.id);
