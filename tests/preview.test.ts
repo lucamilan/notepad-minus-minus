@@ -121,8 +121,22 @@ describe('anteprima Markdown: contenuto', () => {
       ['checkbox', true, true],
     ]);
     expect(host.querySelectorAll('li.task')).toHaveLength(2);
+    // Il testo dell'attività è il nome della casella (lettori di schermo).
+    expect(boxes.map((b) => b.labels?.[0]?.textContent?.trim())).toEqual(['da fare', 'fatto']);
     expect(host.textContent).toContain('da fare');
     expect(host.textContent).not.toContain('[ ]');
+  });
+
+  it('il <label> delle attività non accetta attributi né HTML dal testo', () => {
+    const host = render(
+      '- [ ] <label for="x" onclick="alert(1)">finto</label> [link](javascript:alert(1)) #tag',
+    );
+    const label = host.querySelector('label');
+    expect(label?.attributes).toHaveLength(0);
+    expect(host.querySelectorAll('label')).toHaveLength(1);
+    expect(label?.textContent).toContain('<label for="x" onclick="alert(1)">finto</label>');
+    expect(label?.querySelector('[data-tag]')?.textContent).toBe('#tag');
+    expectInert(host);
   });
 
   it('allineamento delle tabelle con classi, non con stile inline', () => {

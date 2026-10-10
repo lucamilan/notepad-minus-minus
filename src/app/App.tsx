@@ -1,14 +1,25 @@
 import { useEffect } from 'preact/hooks';
 import { vaultState } from '../features/crypto/vault';
 import { VaultFrame, VaultScreen } from '../features/crypto/VaultScreen';
+import { UpdateBanner } from '../features/pwa/UpdateBanner';
 import { loadWorkspace, workspaceComponent, workspaceLoadFailed } from './lazyWorkspace';
 
 /**
  * Guscio dell'app: con le note bloccate mostra solo le schermate della passphrase; sbloccate,
  * l'area delle note (Workspace.tsx), caricata a parte. Bloccando, l'area si smonta tutta:
  * editor, anteprima e dialoghi spariscono dal DOM insieme al testo che mostravano.
+ * L'avviso di aggiornamento resta montato in entrambi i casi.
  */
 export function App() {
+  return (
+    <>
+      <Screen />
+      <UpdateBanner />
+    </>
+  );
+}
+
+function Screen() {
   const vault = vaultState.value;
   const unlocked = vault.status === 'unlocked';
 

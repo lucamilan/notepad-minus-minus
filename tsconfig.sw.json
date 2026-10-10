@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker"],
+    "types": [],
+    "isolatedModules": false,
+    "verbatimModuleSyntax": false
+  },
+  "include": ["src/sw"],
+  "exclude": []
+}

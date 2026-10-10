@@ -87,6 +87,8 @@ interface QueuedNote {
   held: boolean;
 }
 let lockedQueue: QueuedNote[] = [];
+/** Quante note aspettano lo sblocco per essere salvate (l'avviso di aggiornamento lo usa). */
+export const lockedQueueCount = signal(0);
 let guardTarget: Window | undefined;
 
 function onBeforeUnload(e: BeforeUnloadEvent): void {
@@ -101,6 +103,7 @@ function onBeforeUnload(e: BeforeUnloadEvent): void {
  */
 function setLockedQueue(next: QueuedNote[]): void {
   lockedQueue = next;
+  lockedQueueCount.value = next.length;
   if (!guardTarget) return;
   if (next.length > 0) guardTarget.addEventListener('beforeunload', onBeforeUnload);
   else guardTarget.removeEventListener('beforeunload', onBeforeUnload);
@@ -124,7 +127,7 @@ export function resetVaultForTests(): void {
   codec?.forget();
   codec = undefined;
   locking = null;
-  unlocking = null;
+  endUnlocking();
   setLockedQueue([]);
   kdfOptions = {};
   minIterations = undefined;
@@ -214,14 +217,31 @@ export type SetupResult = 'ok' | 'exists' | 'invalid' | 'locked' | 'error';
  * Sblocco (o prima creazione) in corso: un blocco chiesto nel frattempo (Alt+L, un'altra
  * scheda, inattività) non va perso, lo si applica appena finisce di caricare.
  */
-let unlocking: { lockRequested: LockReason | null } | null = null;
+interface Unlocking {
+  lockRequested: LockReason | null;
+  /** Si risolve a sblocco finito (riuscito o no): lo aspetta settleBeforeReload. */
+  done: Promise<void>;
+  finish: () => void;
+}
+let unlocking: Unlocking | null = null;
+
+function beginUnlocking(): Unlocking {
+  let finish = () => {};
+  const done = new Promise<void>((resolve) => (finish = resolve));
+  return { lockRequested: null, done, finish };
+}
+
+function endUnlocking(): void {
+  unlocking?.finish();
+  unlocking = null;
+}
 
 /** Prima passphrase: crea il portachiavi, cifra le note del vecchio archivio e apre le note. */
 export async function setupVault(passphrase: string): Promise<SetupResult> {
   const connection = db;
   if (!connection || vaultState.value.status !== 'setup' || unlocking) return 'error';
   if (passphraseLength(passphrase) < PASSPHRASE_MIN_LENGTH) return 'invalid';
-  unlocking = { lockRequested: null };
+  unlocking = beginUnlocking();
   try {
     const { keyring, key } = await createKeyring(passphrase, kdfOptions);
     if (vaultState.value.status !== 'setup' || db !== connection) return 'error';
@@ -234,7 +254,7 @@ export async function setupVault(passphrase: string): Promise<SetupResult> {
     console.error(error);
     return 'error';
   } finally {
-    unlocking = null;
+    endUnlocking();
   }
 }
 
@@ -244,7 +264,7 @@ export async function unlockVault(passphrase: string): Promise<UnlockResult> {
   if (locking) await locking;
   const connection = db;
   if (!connection || vaultState.value.status !== 'locked' || unlocking) return 'error';
-  unlocking = { lockRequested: null };
+  unlocking = beginUnlocking();
   try {
     // Si rilegge ogni volta: un'altra scheda può aver cambiato passphrase.
     const keyring = parseKeyring(await readKeyring(connection), readKeyringParams());
@@ -256,7 +276,7 @@ export async function unlockVault(passphrase: string): Promise<UnlockResult> {
     console.error(error);
     return 'error';
   } finally {
-    unlocking = null;
+    endUnlocking();
   }
 }
 
@@ -319,8 +339,9 @@ async function resumeLockedQueue(aes: AesCodec): Promise<void> {
   if (lockedQueue.length === 0) return;
   const state = notesState.value;
   if (state.status !== 'ready') return; // si riprova al prossimo sblocco
+  // La coda si svuota solo quando le note sono tornate nel salvataggio continuo: se nel
+  // frattempo la pagina si ricarica (aggiornamento), il browser chiede ancora conferma.
   const queue = lockedQueue;
-  setLockedQueue([]);
   const decoded = await Promise.allSettled(queue.map((entry) => aes.decode(entry.record)));
   batch(() => {
     decoded.forEach((result, i) => {
@@ -343,6 +364,7 @@ async function resumeLockedQueue(aes: AesCodec): Promise<void> {
       }
     });
   });
+  setLockedQueue(lockedQueue.filter((entry) => !queue.includes(entry)));
   await flushSaves();
 }
 
@@ -397,6 +419,21 @@ async function finishLock(aes: AesCodec | undefined): Promise<void> {
     aes?.forget();
     if (codec === aes) codec = undefined;
   }
+}
+
+/**
+ * Prima di ricaricare per un aggiornamento (pulsante "Aggiorna"): finisce uno sblocco o un
+ * blocco in corso e scrive le modifiche in coda. Da bloccate la coda è vuota; le note cifrate rimaste da parte
+ * (lockedQueue) fanno chiedere conferma al browser prima di ricaricare.
+ */
+export async function settleBeforeReload(): Promise<void> {
+  // Uno sblocco in corso rimette in coda le note trattenute al blocco: si aspetta che finisca
+  // (e un eventuale blocco chiesto nel frattempo), poi si scrive.
+  while (unlocking || locking) {
+    if (unlocking) await unlocking.done;
+    if (locking) await locking;
+  }
+  await flushSaves();
 }
 
 export type ChangeResult = 'ok' | 'wrong' | 'invalid' | 'error';

@@ -57,3 +57,26 @@ export async function reloadUnlocked(page: Page): Promise<void> {
   await page.reload();
   await unlockVault(page);
 }
+
+/**
+ * Con i service worker attivi: aspetta che l'installazione (la cache dei file dell'app) sia
+ * finita prima che il test chiuda il contesto, per lo stesso motivo di waitForPendingSaves.
+ */
+export async function waitForServiceWorker(page: Page): Promise<void> {
+  if (page.isClosed()) return;
+  await page
+    .evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) return;
+      const worker = registration.installing ?? registration.waiting ?? registration.active;
+      if (!worker || worker.state === 'activated' || worker.state === 'installed') return;
+      await new Promise<void>((done) => {
+        const check = () => {
+          if (worker.state !== 'installing' && worker.state !== 'activating') done();
+        };
+        worker.addEventListener('statechange', check);
+        check();
+      });
+    })
+    .catch(() => undefined);
+}
