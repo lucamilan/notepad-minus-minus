@@ -15,7 +15,7 @@ const CONTENT_SECURITY_POLICY = [
   "base-uri 'none'",
   "form-action 'none'",
   "require-trusted-types-for 'script'",
-  'trusted-types notepad-md dompurify',
+  'trusted-types dompurify',
 ].join('; ');
 
 function contentSecurityPolicy(): Plugin {

@@ -347,6 +347,193 @@ button {
 .note-panel {
   flex: 1;
   min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.note-panel[data-mode='split'] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.note-panel[data-mode='split'] .note-editor {
+  border-right: 1px solid var(--line);
+}
+
+.note-editor {
+  min-height: 0;
+  min-width: 0;
+}
+
+.note-editor[hidden] {
+  display: none;
+}
+
+/* Modalità di visualizzazione: pulsanti a interruttore nella barra superiore */
+.mode-switch {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.mode-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  padding: 5px 11px;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.mode-switch button + button {
+  border-left: 1px solid var(--line);
+}
+
+.mode-switch button:hover {
+  color: var(--accent);
+}
+
+.mode-switch button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.mode-switch button:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Anteprima Markdown */
+.preview {
+  overflow: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 28px 40px;
+  background: var(--paper);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.preview:focus-visible {
+  outline-offset: -2px;
+}
+
+.preview > * {
+  max-width: 70ch;
+}
+
+.preview :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--f-display);
+  margin: 0.7em 0 0.3em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.preview h1 {
+  font-size: 1.6rem;
+}
+
+.preview h2 {
+  font-size: 1.22rem;
+}
+
+.preview :is(h3, h4, h5, h6) {
+  font-size: 1.05rem;
+}
+
+.preview :is(p, ul, ol, blockquote, pre, table) {
+  margin: 0 0 0.75em;
+}
+
+.preview :is(ul, ol) {
+  padding-left: 1.4em;
+}
+
+.preview li.task {
+  list-style: none;
+}
+
+.preview li.task > p > input,
+.preview li.task > input {
+  margin: 0 0.4em 0 -1.3em;
+  accent-color: var(--accent);
+  vertical-align: -1px;
+}
+
+.preview blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  color: var(--muted);
+  margin-left: 0;
+}
+
+.preview pre {
+  background: var(--code);
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  overflow-wrap: normal;
+}
+
+.preview code {
+  font-family: var(--f-mono);
+  font-size: 0.86em;
+  background: var(--code);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.preview pre code {
+  padding: 0;
+  background: none;
+}
+
+.preview a {
+  color: var(--accent);
+}
+
+.preview hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.preview table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+.preview :is(th, td) {
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+}
+
+.preview .align-center {
+  text-align: center;
+}
+
+.preview .align-right {
+  text-align: right;
+}
+
+.preview img {
+  max-width: 100%;
+}
+
+.preview .blocked-image {
+  display: inline-flex;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 4px 10px;
 }
 
 /* Nessuna scheda aperta */
@@ -610,6 +797,33 @@ button {
 .seg label:has(input:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+@media (max-width: 760px) {
+  .note-panel[data-mode='split'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .note-panel[data-mode='split'] .note-editor {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .preview {
+    padding: 14px 16px 30px;
+  }
+
+  /* Su schermi stretti restano le icone; il testo resta per i lettori di schermo. */
+  .mode-label,
+  .badge span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 560px) {
