@@ -1,1 +1,0 @@
-dotnet publish src/notepad.csproj -c Release -o dist/notepad-minus-minus --nologo
