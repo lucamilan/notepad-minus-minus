@@ -142,6 +142,14 @@ function readKeyringParams() {
 }
 
 /**
+ * Parametri PBKDF2 anche per il file di esportazione (F8): quelli di produzione, salvo che i
+ * test li abbiano abbassati con configureVaultForTests.
+ */
+export function transferKdfParams(): { iterations?: number; minIterations?: number } {
+  return { ...kdfOptions, ...readKeyringParams() };
+}
+
+/**
  * La connessione si è chiusa (aggiornamento o eliminazione da un'altra scheda, errore del
  * browser). Da sbloccate lo mostra l'area delle note; altrimenti la schermata di blocco.
  */

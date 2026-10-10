@@ -183,3 +183,60 @@
 .change-status:empty {
   margin: 0;
 }
+
+/* Esportazione e importazione (F8) */
+.transfer-dialog code {
+  font-family: var(--f-mono);
+  font-size: 0.85em;
+}
+
+.confirm p.transfer-summary {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.transfer-modes {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.transfer-modes legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.transfer-modes label,
+.transfer-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.transfer-modes label > span {
+  display: grid;
+  gap: 2px;
+}
+
+.transfer-modes input,
+.transfer-check input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.transfer-check {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--warn-soft);
+}
+
+.vault-field input[type='file'] {
+  padding: 6px;
+}

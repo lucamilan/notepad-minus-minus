@@ -58,6 +58,17 @@ export function sortNotes(notes: readonly Note[]): Note[] {
   );
 }
 
+/** Stessa nota, campo per campo. */
+export function sameNote(a: Note, b: Note): boolean {
+  return (
+    a.id === b.id &&
+    a.text === b.text &&
+    a.createdAt === b.createdAt &&
+    a.modifiedAt === b.modifiedAt &&
+    a.pinned === b.pinned
+  );
+}
+
 export function isNote(value: unknown): value is Note {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;

@@ -50,6 +50,25 @@ export function currentLockEpoch(): number {
   return lockEpoch;
 }
 
+/**
+ * Data di modifica dell'ultima versione di ogni nota che questa scheda sa essere
+ * nell'archivio (caricata, salvata o riletta da qui). Serve a "rileggi tutto" (crossTab.ts)
+ * per distinguere una nota cambiata altrove da una che ha solo modifiche locali non salvate.
+ */
+const storedVersions = new Map<string, number>();
+
+export function markStored(notes: readonly Note[]): void {
+  for (const note of notes) storedVersions.set(note.id, note.modifiedAt);
+}
+
+export function forgetStored(ids: readonly string[]): void {
+  for (const id of ids) storedVersions.delete(id);
+}
+
+export function storedVersion(id: string): number | undefined {
+  return storedVersions.get(id);
+}
+
 export function getRepository(): NoteRepository {
   if (!repository) throw new Error('Archivio note non ancora aperto');
   return repository;
@@ -101,6 +120,7 @@ async function load(open: Opener): Promise<void> {
     const savedTabs = await repo.getMeta(TABS_META_KEY);
     const views = parseSavedViews(await repo.getMeta(SAVED_VIEWS_META_KEY));
     repository = repo;
+    markStored(notes);
     // Le schede prima delle note: l'interfaccia "pronta" deve già sapere quale nota mostrare.
     hiddenTabIds.current = hiddenTabs(savedTabs, unreadable);
     tabsState.value = restoreTabs(
@@ -179,11 +199,24 @@ export function replaceNote(note: Note): void {
 }
 
 /**
+ * Molte note insieme (importazione, F8): sostituisce o aggiunge `put` e toglie `remove` con
+ * un solo riordino, invece di uno per nota.
+ */
+export function replaceNotes(put: readonly Note[], remove: readonly string[]): void {
+  const state = notesState.value;
+  if (state.status !== 'ready') return;
+  const gone = new Set([...remove, ...put.map((note) => note.id)]);
+  const others = state.notes.filter((note) => !gone.has(note.id));
+  notesState.value = { ...state, notes: sortNotes([...others, ...put]) };
+}
+
+/**
  * Al blocco: via note, schede e viste salvate dalla memoria, e il repository (che tiene il
  * codec con la chiave). Il prossimo sblocco ricarica tutto con initNotes.
  */
 export function resetNotesForLock(): void {
   lockEpoch++;
+  storedVersions.clear();
   repository = undefined;
   initialization = undefined;
   notesState.value = { status: 'loading' };

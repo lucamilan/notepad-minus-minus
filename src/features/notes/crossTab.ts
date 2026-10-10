@@ -12,13 +12,17 @@ import {
   restorePendingSave,
   setSavedListener,
 } from './autosave';
-import type { Note } from './note';
+import { sameNote, sortNotes, type Note } from './note';
+import type { NoteList } from './repository';
 import {
   currentLockEpoch,
+  forgetStored,
   getRepository,
+  markStored,
   notesState,
   removeNote,
   replaceNote,
+  storedVersion,
   updateNote,
 } from './store';
 
@@ -37,7 +41,9 @@ type Message =
   | { id: string; deleted: true }
   | { savedViews: true }
   /** Blocco manuale: anche le altre schede si bloccano. */
-  | { locked: true };
+  | { locked: true }
+  /** Importazione di molte note (F8): le altre schede rileggono tutto l'archivio. */
+  | { reloadAll: true };
 
 export type ElsewhereChange = 'modified' | 'deleted';
 
@@ -69,6 +75,45 @@ export function announceLocked(): void {
   post({ locked: true });
 }
 
+/** Oltre questo numero di note cambiate un'importazione chiede di rileggere tutto. */
+export const RELOAD_ALL_THRESHOLD = 50;
+
+/**
+ * Note scritte o eliminate da un'importazione (F8): unendo, poche si annunciano una per una,
+ * come i salvataggi; molte, o sostituendo, con un solo `{ reloadAll: true }`. Mai contenuto.
+ */
+export function announceImported(
+  written: readonly { id: string; modifiedAt: number }[],
+  removed: readonly string[],
+  replaced: boolean,
+): void {
+  // Sostituendo una nota può tornare a una versione più vecchia, che i messaggi singoli
+  // farebbero ignorare: si chiede sempre di rileggere tutto.
+  if (replaced || written.length + removed.length > RELOAD_ALL_THRESHOLD) {
+    post({ reloadAll: true });
+    return;
+  }
+  for (const id of removed) post({ id, deleted: true });
+  for (const { id, modifiedAt } of written) post({ id, modifiedAt });
+}
+
+/**
+ * Dopo un'importazione riuscita in questa scheda: le note scritte o eliminate non hanno più
+ * avvisi né salvataggi trattenuti, tornano a potersi salvare e l'editor di quelle riscritte si
+ * ricrea con il testo nuovo. Le modifiche in coda le ha già tolte chi importa, prima di scrivere.
+ */
+export function settleImported(written: readonly string[], removed: readonly string[]): void {
+  batch(() => {
+    for (const id of [...written, ...removed]) {
+      if (changedElsewhere.value.has(id)) mark(id, null);
+    }
+    for (const id of written) {
+      allowSaving(id);
+      bumpRevision(id);
+    }
+  });
+}
+
 let lockListener: (() => void) | undefined;
 
 /** Chi blocca questa scheda quando un'altra si blocca a mano (vault.ts). */
@@ -85,7 +130,7 @@ export function resetCrossTabForLock(): void {
 function isMessage(value: unknown): value is Message {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (v['savedViews'] === true || v['locked'] === true) return true;
+  if (v['savedViews'] === true || v['locked'] === true || v['reloadAll'] === true) return true;
   if (typeof v['id'] !== 'string' || v['id'].length > 64) return false;
   return (
     v['deleted'] === true ||
@@ -128,6 +173,10 @@ async function onMessage(message: Message): Promise<void> {
     await reloadSavedViews();
     return;
   }
+  if ('reloadAll' in message) {
+    await reloadAll();
+    return;
+  }
   const local = localNote(message.id);
   const busy = tabsState.value.active === message.id || isPendingSave(message.id);
   if ('deleted' in message) {
@@ -159,10 +208,98 @@ async function reloadNote(id: string): Promise<void> {
       return;
     }
     allowSaving(id);
+    markStored([fresh]);
     replaceNote(fresh);
   } catch (error) {
     console.error(error);
   }
+}
+
+/** Nota aperta nella scheda attiva, con modifiche non ancora salvate qui o già in avviso. */
+function isBusy(id: string): boolean {
+  return tabsState.value.active === id || isPendingSave(id) || changedElsewhere.value.has(id);
+}
+
+/**
+ * Note che un'importazione in questa scheda non deve toccare: modifiche non salvate (anche
+ * trattenute) o un avviso aperto per un cambio in un'altra scheda. Restano "in conflitto".
+ */
+export function hasLocalConflict(id: string): boolean {
+  return isPendingSave(id) || changedElsewhere.value.has(id);
+}
+
+/**
+ * Una nota occupata qui (attiva o con modifiche non salvate o trattenute) è cambiata
+ * nell'archivio per mano di un'altra scheda? Con modifiche locali la copia in memoria è
+ * diversa dall'archivio comunque: conta solo se la versione salvata non è più quella che
+ * questa scheda conosce (storedVersion). Senza modifiche locali ogni differenza conta.
+ */
+function changedElsewhereThan(local: Note, stored: Note): boolean {
+  if (!isPendingSave(local.id)) return true;
+  const known = storedVersion(local.id);
+  return known === undefined ? stored.modifiedAt > local.modifiedAt : stored.modifiedAt !== known;
+}
+
+/**
+ * "Rileggi tutto" (importazione in un'altra scheda, F8): l'archivio è la verità. Ogni nota
+ * salvata diversa dalla copia in memoria si adotta, anche se più vecchia (una sostituzione
+ * può riportare una versione precedente); le note occupate qui ricevono invece l'avviso e i
+ * loro salvataggi restano trattenuti. Contano come eliminate solo le note che c'erano già
+ * prima della lettura: una nota creata qui nel frattempo non è ancora nell'archivio.
+ */
+async function reloadAll(): Promise<void> {
+  const epoch = currentLockEpoch();
+  const before = notesState.value;
+  if (before.status !== 'ready') return;
+  const known = new Set(before.notes.map((note) => note.id));
+  let stored: NoteList;
+  try {
+    stored = await getRepository().list();
+  } catch (error) {
+    console.error(error);
+    return;
+  }
+  const state = notesState.value;
+  if (currentLockEpoch() !== epoch || state.status !== 'ready') return;
+  const fresh = new Map(stored.notes.map((note) => [note.id, note]));
+  const unreadable = new Set(stored.unreadable);
+  const next: Note[] = [];
+  const adopted: Note[] = [];
+  const toClose: string[] = [];
+  batch(() => {
+    for (const local of state.notes) {
+      const latest = fresh.get(local.id);
+      fresh.delete(local.id);
+      if (!latest) {
+        // Creata durante la lettura, o diventata illeggibile: non vuol dire eliminata.
+        if (!known.has(local.id) || unreadable.has(local.id)) next.push(local);
+        else if (isBusy(local.id)) {
+          mark(local.id, 'deleted');
+          next.push(local);
+        } else toClose.push(local.id);
+      } else if (sameNote(local, latest)) {
+        next.push(local);
+      } else if (isBusy(local.id)) {
+        if (changedElsewhereThan(local, latest)) mark(local.id, 'modified');
+        next.push(local);
+      } else {
+        allowSaving(local.id);
+        adopted.push(latest);
+        bumpRevision(local.id);
+        next.push(latest);
+      }
+    }
+    // Note nuove, mai viste qui.
+    for (const note of fresh.values()) {
+      allowSaving(note.id);
+      adopted.push(note);
+      next.push(note);
+    }
+    markStored(adopted);
+    forgetStored(toClose);
+    for (const id of toClose) closeTab(id);
+    notesState.value = { ...state, notes: sortNotes(next) };
+  });
 }
 
 async function reloadSavedViews(): Promise<void> {
@@ -188,6 +325,7 @@ export async function loadLatestVersion(id: string): Promise<void> {
     mark(id, null);
     if (fresh) {
       allowSaving(id);
+      markStored([fresh]);
       replaceNote(fresh);
       bumpRevision(id);
     } else {
