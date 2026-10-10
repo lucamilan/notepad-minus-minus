@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { PinIcon, TrashIcon } from '../../app/icons';
+import { CopyIcon, PinIcon, TrashIcon } from '../../app/icons';
 import { focusAfterModal } from '../../lib/focus';
 import { formatRelative } from '../../lib/format';
 import { changedElsewhere, keepThisVersion, loadLatestVersion } from '../notes/crossTab';
 import { noteTitle, type Note } from '../notes/note';
-import { focusTabs } from '../tabs/actions';
+import { duplicateNote, focusTabs, isRepeatedClick } from '../tabs/actions';
 import { deleteNote, applyFilter, togglePinned } from './actions';
 import { TagChip } from './Collection';
 import { deleteRequest, showSidebar } from './state';
 import { categoryOf, noteInfo } from './tags';
 
-/** Barra sopra il testo: fissa, tag della nota (filtrano la raccolta), data, elimina. */
+/** Barra sopra il testo: fissa, duplica, tag della nota (filtrano la raccolta), data, elimina. */
 export function NoteBar({ note }: { note: Note }) {
   const { tags } = noteInfo(note);
   return (
@@ -26,6 +26,17 @@ export function NoteBar({ note }: { note: Note }) {
         >
           <PinIcon />
           <span>Fissa</span>
+        </button>
+        <button
+          type="button"
+          class="small-button duplicate-button"
+          title="Crea una copia di questa nota"
+          onClick={(e) => {
+            if (!isRepeatedClick(e)) void duplicateNote(note.id);
+          }}
+        >
+          <CopyIcon />
+          <span>Duplica</span>
         </button>
         <span class="note-tags">
           {tags.length === 0 ? (

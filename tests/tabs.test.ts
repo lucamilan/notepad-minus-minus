@@ -2,7 +2,15 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { plainCodec } from '../src/features/notes/codec';
+import { changedElsewhere } from '../src/features/notes/crossTab';
 import { openNotepadDb } from '../src/features/notes/database';
+import { collectionFilter } from '../src/features/collection/state';
+import {
+  editNote,
+  flushSaves,
+  isPendingSave,
+  resetAutosaveForTests,
+} from '../src/features/notes/autosave';
 import {
   createNote,
   NEW_NOTE_TEXT,
@@ -10,6 +18,7 @@ import {
   noteTitle,
   tabTitle,
   UNTITLED,
+  type Note,
 } from '../src/features/notes/note';
 import { createNoteRepository, type NoteRepository } from '../src/features/notes/repository';
 import {
@@ -18,16 +27,20 @@ import {
   resetNotesStoreForTests,
   updateNoteText,
 } from '../src/features/notes/store';
+import { viewMode } from '../src/features/preview/viewMode';
 import {
   actionError,
   closeActiveTab,
+  closeAllTabs,
   closeTab,
   createNoteInNewTab,
   cycleTabKeepingEditorFocus,
+  duplicateNote,
   editorFocusRequest,
   isRepeatedClick,
   openTab,
 } from '../src/features/tabs/actions';
+import { announcement, resetAnnouncement } from '../src/lib/announce';
 import {
   hiddenTabs,
   isTabsState,
@@ -240,5 +253,217 @@ describe('schede e archivio', () => {
     cycleTabKeepingEditorFocus(1);
     expect(tabsState.value.active).toBe(b.id);
     expect(editorFocusRequest.value).toEqual({ id: b.id });
+  });
+});
+
+describe('chiudi tutte le schede', () => {
+  let repo: NoteRepository;
+
+  beforeEach(async () => {
+    globalThis.indexedDB = new IDBFactory();
+    resetNotesStoreForTests();
+    resetAutosaveForTests();
+    repo = createNoteRepository(await openNotepadDb(), plainCodec);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetAutosaveForTests();
+    resetNotesStoreForTests();
+    changedElsewhere.value = new Map();
+  });
+
+  it('chiude tutte le schede con una sola scrittura e non elimina le note', async () => {
+    const [a, b, c] = [createNote('A', 1), createNote('B', 2), createNote('C', 3)];
+    await repo.putMany([a, b, c]);
+    await repo.putMeta(TABS_META_KEY, { open: [a.id, b.id, c.id], active: b.id });
+    await initNotes(() => Promise.resolve(repo));
+    const putMeta = vi.spyOn(repo, 'putMeta');
+
+    closeAllTabs();
+    expect(tabsState.value).toEqual({ open: [], active: null });
+    expect(putMeta).toHaveBeenCalledTimes(1);
+    await vi.waitFor(async () =>
+      expect(await repo.getMeta(TABS_META_KEY)).toEqual({ open: [], active: null }),
+    );
+    expect((await repo.list()).notes).toHaveLength(3);
+    const state = notesState.value;
+    expect(state.status === 'ready' && state.notes).toHaveLength(3);
+
+    // Senza schede aperte non c'è niente da salvare.
+    closeAllTabs();
+    expect(putMeta).toHaveBeenCalledTimes(1);
+  });
+
+  it('lascia aperte le note cambiate in un’altra scheda, in attesa della scelta', async () => {
+    const [a, b, c] = [createNote('A', 1), createNote('B', 2), createNote('C', 3)];
+    await repo.putMany([a, b, c]);
+    await repo.putMeta(TABS_META_KEY, { open: [a.id, b.id, c.id], active: a.id });
+    await initNotes(() => Promise.resolve(repo));
+    changedElsewhere.value = new Map([[b.id, 'modified']]);
+
+    closeAllTabs();
+    expect(tabsState.value).toEqual({ open: [b.id], active: b.id });
+    await vi.waitFor(async () =>
+      expect(await repo.getMeta(TABS_META_KEY)).toEqual({ open: [b.id], active: b.id }),
+    );
+  });
+
+  it('le modifiche in coda si salvano anche dopo aver chiuso le schede', async () => {
+    const a = createNote('A', 1);
+    await repo.put(a);
+    await repo.putMeta(TABS_META_KEY, { open: [a.id], active: a.id });
+    await initNotes(() => Promise.resolve(repo));
+
+    editNote(a.id, 'A modificata');
+    closeAllTabs();
+    expect(isPendingSave(a.id)).toBe(true);
+    await flushSaves();
+    expect((await repo.get(a.id))?.text).toBe('A modificata');
+  });
+
+  it('le schede nascoste delle note illeggibili restano nello stato salvato', async () => {
+    const a = createNote('A', 1);
+    await repo.put(a);
+    await openNotepadDb().then((db) =>
+      db.put('notes', { id: 'rotta', format: 'futuro-v9', payload: null }),
+    );
+    await repo.putMeta(TABS_META_KEY, { open: [a.id, 'rotta'], active: a.id });
+    await initNotes(() => Promise.resolve(repo));
+
+    closeAllTabs();
+    expect(tabsState.value).toEqual({ open: [], active: null });
+    await vi.waitFor(async () =>
+      expect(await repo.getMeta(TABS_META_KEY)).toEqual({ open: ['rotta'], active: null }),
+    );
+  });
+});
+
+describe('duplica la nota', () => {
+  let repo: NoteRepository;
+  let original: Note;
+
+  beforeEach(async () => {
+    globalThis.indexedDB = new IDBFactory();
+    resetNotesStoreForTests();
+    resetAutosaveForTests();
+    actionError.value = null;
+    editorFocusRequest.value = null;
+    resetAnnouncement();
+    repo = createNoteRepository(await openNotepadDb(), plainCodec);
+    original = { ...createNote('# Riunione\n#cliente/acme\n- [ ] verbale', 1000), pinned: true };
+    await repo.put(original);
+    await repo.putMeta(TABS_META_KEY, { open: [original.id], active: original.id });
+    await initNotes(() => Promise.resolve(repo));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetAutosaveForTests();
+    resetNotesStoreForTests();
+    resetAnnouncement();
+    collectionFilter.value = { view: 'all', tags: [] };
+    viewMode.value = 'split';
+  });
+
+  const inMemory = (id: string) => {
+    const state = notesState.value;
+    return state.status === 'ready' ? state.notes.find((note) => note.id === id) : undefined;
+  };
+
+  it('copia il testo in memoria con id e date nuovi, non fissata, aperta e attiva', async () => {
+    // Modifica non ancora salvata: la copia parte dal testo in memoria.
+    editNote(original.id, `${original.text}\nnon ancora salvato`);
+    const edited = inMemory(original.id);
+    const pending = duplicateNote(original.id, 9000);
+    // La scheda si apre prima che l'archivio confermi.
+    const { open, active } = tabsState.value;
+    expect(open).toHaveLength(2);
+    expect(active).toBe(open[1]);
+    expect(active).not.toBe(original.id);
+    await pending;
+
+    expect(await repo.get(active ?? '')).toEqual({
+      id: active,
+      text: edited?.text,
+      createdAt: 9000,
+      modifiedAt: 9000,
+      pinned: false,
+    });
+    expect(editorFocusRequest.value).toEqual({ id: active, selection: { anchor: 0, head: 0 } });
+    // L'originale resta com'era.
+    expect(inMemory(original.id)).toBe(edited);
+    await vi.waitFor(() => expect(announcement.value).toBe('Nota duplicata'));
+  });
+
+  it('con un salvataggio in coda si salvano sia l’originale sia la copia', async () => {
+    editNote(original.id, 'testo nuovo');
+    expect(isPendingSave(original.id)).toBe(true);
+    await duplicateNote(original.id, 9000);
+    await flushSaves();
+    const stored = (await repo.list()).notes;
+    expect(stored).toHaveLength(2);
+    expect(stored.map((note) => note.text)).toEqual(['testo nuovo', 'testo nuovo']);
+    expect(stored.find((note) => note.id === original.id)?.pinned).toBe(true);
+  });
+
+  it('dalla sola anteprima passa all’affiancata; nella vista Fissate passa a Tutte', async () => {
+    viewMode.value = 'preview';
+    collectionFilter.value = { view: 'pinned', tags: ['cliente/acme'] };
+    await duplicateNote(original.id, 9000);
+    expect(viewMode.value).toBe('split');
+    expect(collectionFilter.value).toEqual({ view: 'all', tags: ['cliente/acme'] });
+  });
+
+  it('se la copia non si salva lo dice e torna tutto com’era', async () => {
+    collectionFilter.value = { view: 'pinned', tags: [] };
+    const tabsBefore = tabsState.value;
+    const notesBefore = notesState.value;
+    vi.spyOn(repo, 'put').mockRejectedValueOnce(new DOMException('x', 'QuotaExceededError'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await duplicateNote(original.id);
+    expect(tabsState.value).toEqual(tabsBefore);
+    expect(notesState.value).toEqual(notesBefore);
+    expect(collectionFilter.value).toEqual({ view: 'pinned', tags: [] });
+    expect(actionError.value).toContain('Spazio di archiviazione esaurito');
+    expect((await repo.list()).notes).toHaveLength(1);
+    expect(announcement.value).toBe('');
+  });
+
+  it('bloccando durante la scrittura la copia non torna in memoria e non si annuncia', async () => {
+    let finish: () => void = () => undefined;
+    vi.spyOn(repo, 'put').mockImplementationOnce(
+      () => new Promise<void>((resolve) => (finish = resolve)),
+    );
+    announcement.value = 'precedente';
+    const pending = duplicateNote(original.id);
+    resetNotesStoreForTests(); // come il blocco: nuova epoca, note fuori dalla memoria
+    finish();
+    await pending;
+    expect(notesState.value).toEqual({ status: 'loading' });
+    expect(tabsState.value).toEqual({ open: [], active: null });
+    // announce() avrebbe svuotato subito il messaggio precedente e lo riscrive dopo 100 ms.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(announcement.value).toBe('precedente');
+  });
+
+  it('a note bloccate, o per una nota che non c’è, non fa nulla', async () => {
+    await duplicateNote('inesistente');
+    expect(tabsState.value.open).toEqual([original.id]);
+    resetNotesStoreForTests();
+    const put = vi.spyOn(repo, 'put');
+    announcement.value = 'precedente';
+    await duplicateNote(original.id);
+    expect(put).not.toHaveBeenCalled();
+    expect(tabsState.value).toEqual({ open: [], active: null });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(announcement.value).toBe('precedente');
+  });
+
+  it('se un filtro di tag nasconderebbe la copia, toglie anche i tag', async () => {
+    // La nota attiva può non avere i tag del filtro: la copia, uguale, non li ha nemmeno lei.
+    collectionFilter.value = { view: 'open', tags: ['progetto/sito'] };
+    await duplicateNote(original.id, 9000);
+    expect(collectionFilter.value).toEqual({ view: 'all', tags: [] });
   });
 });

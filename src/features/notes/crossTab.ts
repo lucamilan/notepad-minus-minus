@@ -63,6 +63,11 @@ function post(message: Message): void {
   }
 }
 
+/** Nota scritta nell'archivio fuori dal salvataggio continuo (creata, duplicata): id e data. */
+export function announceSaved(note: Pick<Note, 'id' | 'modifiedAt'>): void {
+  post({ id: note.id, modifiedAt: note.modifiedAt });
+}
+
 export function announceDeleted(id: string): void {
   post({ id, deleted: true });
 }
@@ -355,7 +360,7 @@ export function startCrossTabSync(): () => void {
     if (isMessage(event.data)) void onMessage(event.data);
   };
   setSavedListener((notes) => {
-    for (const note of notes) post({ id: note.id, modifiedAt: note.modifiedAt });
+    for (const note of notes) announceSaved(note);
   });
   return () => {
     setSavedListener(undefined);

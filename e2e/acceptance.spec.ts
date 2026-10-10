@@ -240,6 +240,22 @@ test('sul telefono (390×844) blocco e note si usano senza scorrere di lato', as
   await expect(page.getByRole('button', { name: '+ Nuova nota' })).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Blocca' })).toBeInViewport();
 
+  // "Chiudi tutte le schede" resta visibile e staccata da "+ Nuova nota", anche con molte schede.
+  const newTab = page.getByRole('button', { name: '+ Nuova nota' });
+  const closeAll = page.getByRole('button', { name: 'Chiudi tutte le schede' });
+  const gap = async () => {
+    const [a, b] = [await newTab.boundingBox(), await closeAll.boundingBox()];
+    return a && b ? b.x - (a.x + a.width) : -1;
+  };
+  await expect(closeAll).toBeInViewport({ ratio: 1 });
+  expect(await gap()).toBeGreaterThanOrEqual(16);
+  for (let i = 0; i < 5; i++) await newTab.click();
+  await expect(page.getByRole('tab')).toHaveCount(6);
+  await expect(newTab).toBeInViewport({ ratio: 1 });
+  await expect(closeAll).toBeInViewport({ ratio: 1 });
+  expect(await gap()).toBeGreaterThanOrEqual(16);
+  expect(await scrollsSideways()).toBe(false);
+
   // La raccolta è un pannello sopra le note.
   await page.getByRole('button', { name: 'Raccolta' }).click();
   await expect(collection(page)).toBeVisible();
@@ -287,6 +303,10 @@ test('ogni controllo ha un nome accessibile e non ci sono id duplicati', async (
   expect(await accessibilityProblems(page), 'conferma eliminazione').toEqual([]);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Chiudi tutte le schede' }).click();
+  await expect(page.getByRole('heading', { name: 'Nessuna nota aperta' })).toBeVisible();
+  expect(await accessibilityProblems(page), 'nessuna nota aperta').toEqual([]);
 
   await waitForPendingSaves(page);
   await page.keyboard.press('Alt+L');

@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { formatDateTime } from '../../lib/format';
 import { noteTitle, tabTitle, type Note } from '../notes/note';
+import { CloseAllIcon } from '../../app/icons';
 import {
+  closeAllTabs,
   closeTab,
   createNoteInNewTab,
   focusTabs,
@@ -25,6 +27,7 @@ export function noteTooltip(note: Note): string {
  * Schede secondo il pattern ARIA "tabs": una sola scheda nel giro del Tab, frecce/Home/End
  * per spostarsi (attivazione automatica), Canc per chiudere. Il pulsante × è solo per il
  * mouse (nascosto alle tecnologie assistive e fuori dal Tab): da tastiera si usa Canc o Alt+W.
+ * In fondo, dopo "+ Nuova nota", "Chiudi tutte le schede" (Alt+Shift+W).
  */
 export function TabBar({ notes }: { notes: readonly Note[] }) {
   const { open, active } = tabsState.value;
@@ -135,6 +138,24 @@ export function TabBar({ notes }: { notes: readonly Note[] }) {
       >
         + Nuova nota
       </button>
+      {/* Fuori dal tablist: non è una scheda. Senza schede aperte non serve. Lo spaziatore
+          (almeno 24px) la tiene lontana da "+ Nuova nota": un clic sbagliato non chiude tutto. */}
+      {open.length > 0 && <span class="tabs-spacer" aria-hidden="true" />}
+      {open.length > 0 && (
+        <button
+          type="button"
+          class="tab-close-all"
+          title="Chiudi tutte le schede (Alt+Shift+W)"
+          aria-keyshortcuts="Alt+Shift+W"
+          onClick={() => {
+            closeAllTabs();
+            focusTabs();
+          }}
+        >
+          <CloseAllIcon />
+          <span class="sr-only">Chiudi tutte le schede</span>
+        </button>
+      )}
     </div>
   );
 }

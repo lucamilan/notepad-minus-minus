@@ -1,8 +1,10 @@
 import { batch, signal } from '@preact/signals';
+import { announce } from '../../lib/announce';
 import { collectionFilter } from '../collection/state';
-import { matchesFilter } from '../collection/views';
+import { matchesFilter, NO_FILTER, type CollectionFilter } from '../collection/views';
 import { discardPendingSave } from '../notes/autosave';
-import { createNote, NEW_NOTE_TEXT, NEW_NOTE_TITLE_RANGE } from '../notes/note';
+import { announceSaved, changedElsewhere } from '../notes/crossTab';
+import { createNote, NEW_NOTE_TEXT, NEW_NOTE_TITLE_RANGE, type Note } from '../notes/note';
 import {
   addNote,
   currentLockEpoch,
@@ -82,6 +84,17 @@ export function focusTabs(): void {
   tabFocusRequest.value++;
 }
 
+/**
+ * Chiude tutte le schede visibili con un solo salvataggio dello stato. Le note restano
+ * nell'archivio e le modifiche in coda continuano a salvarsi; le schede nascoste delle note
+ * illeggibili restano nello stato salvato (vedi `tabsToSave`). Restano aperte le note cambiate
+ * in un'altra scheda del browser: il loro avviso aspetta ancora la scelta della versione.
+ */
+export function closeAllTabs(): void {
+  const waiting = changedElsewhere.value;
+  closeTabs(tabsState.value.open.filter((id) => !waiting.has(id)));
+}
+
 export function closeActiveTab(): void {
   const { active } = tabsState.value;
   if (active !== null) closeTab(active);
@@ -116,26 +129,62 @@ export async function createNoteInNewTab(now: number = Date.now()): Promise<void
     ),
     pinned: filter.view === 'pinned',
   };
+  await openNewNote(note, { ...NEW_NOTE_TITLE_RANGE }, now);
+}
+
+/**
+ * Duplica la nota: stesso testo di quello in memoria (modifiche non ancora salvate comprese),
+ * id e date nuovi, non fissata. Si apre in una scheda nuova col cursore all'inizio, come una
+ * nota nuova (stesso percorso di Alt+N, compreso l'annullamento se il salvataggio fallisce).
+ */
+export async function duplicateNote(id: string, now: number = Date.now()): Promise<void> {
+  const state = notesState.value;
+  if (state.status !== 'ready') return;
+  const source = state.notes.find((note) => note.id === id);
+  if (!source) return;
+  if (await openNewNote(createNote(source.text, now), { anchor: 0, head: 0 }, now)) {
+    announce('Nota duplicata');
+  }
+}
+
+/**
+ * Apre subito la nota in una scheda nuova e poi la scrive nell'archivio. Restituisce true se
+ * la nota è stata salvata con le note ancora sbloccate; se il salvataggio fallisce la
+ * creazione si annulla (scheda, memoria, coda di salvataggio e filtro tornano com'erano).
+ */
+async function openNewNote(
+  note: Note,
+  selection: { anchor: number; head: number },
+  now: number,
+): Promise<boolean> {
+  const filter = collectionFilter.value;
   // La scheda si apre prima che l'archivio confermi: chi preme Alt+N e scrive subito
   // non perde i primi caratteri. Se il salvataggio fallisce, la creazione si annulla.
   batch(() => {
     actionError.value = null;
     ensureEditorVisible();
     addNote(note);
-    // Una vista che non la mostrerebbe (es. Attività aperte) lascia il posto a Tutte.
-    if (!matchesFilter(note, filter, now))
-      collectionFilter.value = { view: 'all', tags: filter.tags };
-    editorFocusRequest.value = { id: note.id, selection: { ...NEW_NOTE_TITLE_RANGE } };
+    // Una vista che non la mostrerebbe (es. Attività aperte) lascia il posto a Tutte; se
+    // nemmeno i tag del filtro la mostrano (una copia senza quei tag), si tolgono anche quelli.
+    if (!matchesFilter(note, filter, now)) {
+      const allWithTags: CollectionFilter = { view: 'all', tags: filter.tags };
+      collectionFilter.value = matchesFilter(note, allWithTags, now) ? allWithTags : NO_FILTER;
+    }
+    editorFocusRequest.value = { id: note.id, selection };
     openTab(note.id);
   });
   const epoch = currentLockEpoch();
   try {
     await getRepository().put(note);
-    if (currentLockEpoch() === epoch) markStored([note]);
+    if (currentLockEpoch() !== epoch) return false;
+    markStored([note]);
+    // Le altre schede del browser la rileggono dall'archivio (solo id e data, mai il testo).
+    announceSaved(note);
+    return true;
   } catch (error) {
     console.error(error);
     // Archivio chiuso (c'è già il messaggio) o note bloccate nel frattempo.
-    if (notesState.value.status !== 'ready' || currentLockEpoch() !== epoch) return;
+    if (notesState.value.status !== 'ready' || currentLockEpoch() !== epoch) return false;
     batch(() => {
       collectionFilter.value = filter;
       closeTab(note.id);
@@ -146,5 +195,6 @@ export async function createNoteInNewTab(now: number = Date.now()): Promise<void
           ? 'Spazio di archiviazione esaurito: la nuova nota non è stata creata.'
           : 'Non è stato possibile creare la nota. Ricarica la pagina e riprova.';
     });
+    return false;
   }
 }

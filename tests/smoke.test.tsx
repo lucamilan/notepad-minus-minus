@@ -83,6 +83,20 @@ describe('Workspace', () => {
     expect(root.querySelector('.empty h2')?.textContent).toBe('Nessuna nota aperta');
     expect(root.querySelector('.reopen')?.textContent).toContain('Lista della spesa');
     expect(root.querySelector('.status')?.textContent).not.toContain('Creata il');
+    expect(root.querySelector('.reopen-more')).toBeNull();
+    expect(root.querySelector('.tab-close-all')).toBeNull();
+  });
+
+  it('senza schede aperte elenca solo le 50 note più recenti e rimanda alla ricerca', () => {
+    const notes = Array.from({ length: 53 }, (_, i) => createNote(`Nota ${i}`, i));
+    ready(notes, []);
+    render(<Workspace />, root);
+
+    const items = root.querySelectorAll('.reopen li');
+    expect(items).toHaveLength(50);
+    expect(items[0]?.textContent).toContain('Nota 52');
+    expect(items[49]?.textContent).toContain('Nota 3');
+    expect(root.querySelector('.reopen-more')?.textContent).toBe('e altre 3: usa Cerca nelle note');
   });
 
   it('segnala le note illeggibili senza bloccare le altre', () => {

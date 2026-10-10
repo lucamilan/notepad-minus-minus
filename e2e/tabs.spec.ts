@@ -159,3 +159,74 @@ test('il × chiude la scheda col mouse', async ({ page }) => {
   await expect(tabs(page).first()).toHaveText('Nuova nota');
   await expect(tabs(page).first()).toHaveAttribute('aria-selected', 'true');
 });
+
+const closeAll = (page: Page) => page.getByRole('button', { name: 'Chiudi tutte le schede' });
+const noteItems = (page: Page) =>
+  page.getByRole('complementary', { name: 'Raccolta' }).locator('.note-item');
+
+test('"Chiudi tutte le schede" chiude le schede ma non le note', async ({ page }) => {
+  await openApp(page);
+  await page.getByRole('button', { name: '+ Nuova nota' }).click();
+  await page.keyboard.type('Seconda');
+  await page.keyboard.press('Alt+KeyN');
+  await page.keyboard.type('Terza');
+  await expect(tabs(page)).toHaveCount(3);
+  await expect(closeAll(page)).toHaveAttribute('title', 'Chiudi tutte le schede (Alt+Shift+W)');
+  await expect(closeAll(page)).toHaveAttribute('aria-keyshortcuts', 'Alt+Shift+W');
+
+  // Subito, con "Terza" ancora da salvare: chiudere non scarta le modifiche.
+  await closeAll(page).click();
+  await expect(tabs(page)).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Nessuna nota aperta' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '+ Nuova nota' })).toBeFocused();
+  await expect(closeAll(page)).toHaveCount(0);
+  await expect(noteItems(page)).toHaveCount(3);
+
+  await expect(page.locator('.save-state')).toHaveText(/^Salvato/);
+  await reloadUnlocked(page);
+  await expect(tabs(page)).toHaveCount(0);
+  const reopen = page.getByRole('list', { name: "Note nell'archivio" }).getByRole('button');
+  await expect(reopen).toHaveCount(3);
+  await expect(reopen.filter({ hasText: 'Terza' })).toHaveCount(1);
+});
+
+test('Alt+Shift+W chiude tutte le schede; la pagina vuota si usa da tastiera', async ({ page }) => {
+  await openApp(page);
+  await editor(page).click();
+  await page.keyboard.press('Alt+KeyN');
+  await page.keyboard.type('Seconda');
+  await expect(tabs(page)).toHaveCount(2);
+
+  await page.keyboard.press('Alt+Shift+KeyW');
+  await expect(tabs(page)).toHaveCount(0);
+  const newTab = page.getByRole('button', { name: '+ Nuova nota' });
+  await expect(newTab).toBeFocused();
+
+  // Da "+ Nuova nota": Nuova nota, Cerca, poi le note da riaprire.
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Nuova nota', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  const search = page.getByRole('button', { name: 'Cerca nelle note (Ctrl+K)' });
+  await expect(search).toBeFocused();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Cerca nelle note' });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(search).toBeFocused();
+
+  await page.keyboard.press('Tab');
+  const reopen = page.getByRole('list', { name: "Note nell'archivio" }).getByRole('button');
+  await expect(reopen.first()).toBeFocused();
+  await expect(reopen.first()).toContainText('Seconda');
+  await page.keyboard.press('Enter');
+  await expect(tabs(page)).toHaveCount(1);
+  await expect(tabs(page).first()).toBeFocused();
+  await expect(editor(page)).toContainText('Seconda');
+
+  // Senza schede Alt+Shift+W non fa nulla di male.
+  await page.keyboard.press('Alt+Shift+KeyW');
+  await page.keyboard.press('Alt+Shift+KeyW');
+  await expect(tabs(page)).toHaveCount(0);
+  await expect(newTab).toBeFocused();
+});
