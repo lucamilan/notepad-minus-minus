@@ -2,10 +2,11 @@ import type { RefObject } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { COLLECTION_ID } from '../features/collection/Collection';
 import { sidebarVisible, toggleSidebar } from '../features/collection/state';
+import { lockVault } from '../features/crypto/vault';
 import { notesState } from '../features/notes/store';
 import { ViewModeSwitch } from '../features/preview/ViewModeSwitch';
 import { openSearch } from '../features/search/state';
-import { DeviceIcon, MoreIcon, SearchIcon, SidebarIcon } from './icons';
+import { DeviceIcon, LockIcon, MoreIcon, SearchIcon, SidebarIcon } from './icons';
 
 interface AppBarProps {
   menuButtonRef: RefObject<HTMLButtonElement>;
@@ -107,6 +108,16 @@ export function AppBar({ menuButtonRef, onOpenSettings }: AppBarProps) {
         </button>
       )}
       <ViewModeSwitch />
+      <button
+        type="button"
+        class="icon-button lock-button"
+        aria-keyshortcuts="Alt+L"
+        title="Blocca le note in tutte le schede (Alt+L)"
+        onClick={() => void lockVault('manual')}
+      >
+        <LockIcon />
+        <span class="bar-label">Blocca</span>
+      </button>
       <div
         class="menu-wrap"
         ref={wrapRef}

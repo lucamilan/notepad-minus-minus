@@ -10,3 +10,6 @@ export function openSearch(query = ''): void {
 export function closeSearch(): void {
   searchRequest.value = null;
 }
+
+/** Al blocco il testo cercato esce dalla memoria (l'indice muore con le note). */
+export const resetSearchForLock = closeSearch;

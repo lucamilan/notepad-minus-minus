@@ -2,10 +2,9 @@ import { signal } from '@preact/signals';
 import { parseSavedViews, SAVED_VIEWS_META_KEY } from '../collection/views';
 import { savedViews } from '../collection/state';
 import { hiddenTabIds, hiddenTabs, restoreTabs, TABS_META_KEY, tabsState } from '../tabs/tabs';
-import { plainCodec } from './codec';
-import { openNotepadDb, type ConnectionEvents } from './database';
+import type { ConnectionEvents } from './database';
 import { sortNotes, type Note } from './note';
-import { createNoteRepository, loadNotesEnsuringOne, type NoteRepository } from './repository';
+import { loadNotesEnsuringOne, type NoteRepository } from './repository';
 
 export type NotesState =
   | { status: 'loading'; message?: string }
@@ -14,7 +13,7 @@ export type NotesState =
 
 export const notesState = signal<NotesState>({ status: 'loading' });
 
-const MESSAGES = {
+export const MESSAGES = {
   reload: "Notepad−− è stato aggiornato in un'altra scheda. Ricarica questa pagina per continuare.",
   blocked:
     "Un'altra scheda di Notepad−− usa una versione precedente: chiudila o ricaricala per " +
@@ -40,6 +39,16 @@ export function messageForError(error: unknown): string {
 
 let repository: NoteRepository | undefined;
 let initialization: Promise<void> | undefined;
+/**
+ * Cresce a ogni blocco (e sblocco). Chi riprende dopo un await (eliminazione, rilettura da
+ * un'altra scheda…) confronta l'epoca: se è cambiata le note sono uscite dalla memoria e non
+ * deve rimettercene.
+ */
+let lockEpoch = 0;
+
+export function currentLockEpoch(): number {
+  return lockEpoch;
+}
 
 export function getRepository(): NoteRepository {
   if (!repository) throw new Error('Archivio note non ancora aperto');
@@ -55,19 +64,30 @@ export function setBeforeCloseHook(hook: (() => Promise<void>) | undefined): voi
   beforeCloseHook = hook;
 }
 
-/** Apre l'archivio una sola volta; chiamate successive restituiscono la stessa promessa. */
-export function initNotes(open: Opener = openDefault): Promise<void> {
-  initialization ??= load(open);
-  return initialization;
-}
-
-async function load(open: Opener): Promise<void> {
-  const events: ConnectionEvents = {
+/**
+ * Eventi della connessione all'archivio: chi apre il database (vault.ts) li passa a
+ * openNotepadDb, così salvataggi in coda e messaggi restano gestiti qui.
+ */
+export function connectionEvents(): ConnectionEvents {
+  return {
     beforeClose: () => beforeCloseHook?.() ?? Promise.resolve(),
     onBlocked: () => (notesState.value = { status: 'loading', message: MESSAGES.blocked }),
     onVersionChange: () => fail(MESSAGES.reload),
     onTerminated: () => fail(MESSAGES.terminated),
   };
+}
+
+/**
+ * Carica le note dal repository aperto da `open` (dopo lo sblocco, con il codec cifrato).
+ * Una sola volta fino al prossimo blocco: chiamate successive restituiscono la stessa promessa.
+ */
+export function initNotes(open: Opener): Promise<void> {
+  initialization ??= load(open);
+  return initialization;
+}
+
+async function load(open: Opener): Promise<void> {
+  const events = connectionEvents();
   // Se l'archivio non risponde (succede raramente, per esempio con un'altra scheda bloccata)
   // si spiega cosa fare invece di lasciare "Apertura delle note…" all'infinito.
   const slow = setTimeout(() => {
@@ -102,10 +122,6 @@ const SLOW_OPEN_MS = 8000;
 function fail(message: string) {
   repository = undefined;
   notesState.value = { status: 'error', message };
-}
-
-async function openDefault(events: ConnectionEvents): Promise<NoteRepository> {
-  return createNoteRepository(await openNotepadDb(events), plainCodec);
 }
 
 /** Aggiunge in memoria una nota appena salvata nell'archivio. */
@@ -162,8 +178,12 @@ export function replaceNote(note: Note): void {
   notesState.value = { ...state, notes: sortNotes([...others, note]) };
 }
 
-/** Solo per i test: dimentica l'inizializzazione precedente. */
-export function resetNotesStoreForTests(): void {
+/**
+ * Al blocco: via note, schede e viste salvate dalla memoria, e il repository (che tiene il
+ * codec con la chiave). Il prossimo sblocco ricarica tutto con initNotes.
+ */
+export function resetNotesForLock(): void {
+  lockEpoch++;
   repository = undefined;
   initialization = undefined;
   notesState.value = { status: 'loading' };
@@ -171,3 +191,6 @@ export function resetNotesStoreForTests(): void {
   hiddenTabIds.current = [];
   savedViews.value = [];
 }
+
+/** Solo per i test: dimentica l'inizializzazione precedente. */
+export const resetNotesStoreForTests = resetNotesForLock;

@@ -10,3 +10,49 @@ export async function waitForPendingSaves(page: Page): Promise<void> {
   if ((await state.count()) === 0) return;
   await expect(state).not.toHaveAttribute('data-state', /^(pending|saving)$/);
 }
+
+/** L'unica passphrase dei test e2e (ogni test parte da un contesto, quindi un archivio, nuovo). */
+export const TEST_PASSPHRASE = 'prova e2e con quattro parole';
+
+export const DB_NAME = 'notepad-minus-minus-cifrato';
+export const LEGACY_DB_NAME = 'notepad-minus-minus';
+
+/** L'area delle note è pronta (la barra di stato c'è solo da sbloccate). */
+async function expectUnlocked(page: Page): Promise<void> {
+  await expect(page.locator('footer.status')).toBeVisible();
+}
+
+/** Prima apertura: crea la passphrase. */
+export async function setupVault(page: Page, passphrase: string = TEST_PASSPHRASE): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Proteggi le tue note' })).toBeVisible();
+  await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
+  await page.getByLabel('Ripeti la passphrase').fill(passphrase);
+  await page.getByRole('button', { name: 'Crea la passphrase' }).click();
+  await expectUnlocked(page);
+}
+
+/** Schermata "Note bloccate": sblocca. */
+export async function unlockVault(page: Page, passphrase: string = TEST_PASSPHRASE): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Note bloccate' })).toBeVisible();
+  await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
+  await page.getByRole('button', { name: 'Sblocca' }).click();
+  await expectUnlocked(page);
+}
+
+/**
+ * Apre l'app e arriva alle note: crea la passphrase al primo avvio del contesto, altrimenti
+ * (per esempio una seconda scheda) sblocca.
+ */
+export async function openUnlocked(page: Page, path = '/'): Promise<void> {
+  await page.goto(path);
+  const title = page.locator('#vault-title');
+  await expect(title).toBeVisible();
+  if ((await title.textContent()) === 'Proteggi le tue note') await setupVault(page);
+  else await unlockVault(page);
+}
+
+/** Ricarica la pagina (che riparte bloccata) e sblocca. */
+export async function reloadUnlocked(page: Page): Promise<void> {
+  await page.reload();
+  await unlockVault(page);
+}

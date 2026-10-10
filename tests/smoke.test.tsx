@@ -1,6 +1,8 @@
 import { render } from 'preact';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App';
+import { Workspace } from '../src/app/Workspace';
+import { vaultState } from '../src/features/crypto/vault';
 import { createNote, type Note } from '../src/features/notes/note';
 import { notesState } from '../src/features/notes/store';
 import { tabsState } from '../src/features/tabs/tabs';
@@ -14,7 +16,7 @@ function ready(
   tabsState.value = { open, active: open[0] ?? null };
 }
 
-describe('App', () => {
+describe('Workspace', () => {
   let root: HTMLElement;
 
   beforeEach(() => {
@@ -30,16 +32,17 @@ describe('App', () => {
   });
 
   it("mostra la barra, l'avviso di anteprima e il caricamento delle note", () => {
-    render(<App />, root);
+    render(<Workspace />, root);
 
     expect(root.querySelector('.logo')?.textContent).toContain('Notepad−−');
-    expect(root.querySelector('.notice')?.textContent).toContain('non sono ancora');
+    expect(root.querySelector('.notice')?.textContent).toContain('cifrate');
+    expect(root.querySelector('.lock-button')?.getAttribute('aria-keyshortcuts')).toBe('Alt+L');
     expect(root.querySelector('.workspace')?.textContent).toContain('Apertura delle note');
   });
 
   it("con le note pronte apre l'editor sulla scheda attiva", () => {
     ready([createNote('# Prima nota', 0)]);
-    render(<App />, root);
+    render(<Workspace />, root);
 
     expect(root.querySelector('.editor-host')).not.toBeNull();
     expect(root.querySelector('.status')?.textContent).toContain('Creata il');
@@ -50,7 +53,7 @@ describe('App', () => {
     const long = createNote('## Un titolo decisamente troppo lungo per una scheda\ntesto', 0);
     const other = createNote('Seconda', 0);
     ready([long, other], [long.id, other.id]);
-    render(<App />, root);
+    render(<Workspace />, root);
 
     const tabs = root.querySelectorAll('[role="tablist"] [role="tab"]');
     expect(tabs).toHaveLength(2);
@@ -73,7 +76,7 @@ describe('App', () => {
 
   it('senza schede aperte propone le note da riaprire', () => {
     ready([createNote('# Lista della spesa', 0)], []);
-    render(<App />, root);
+    render(<Workspace />, root);
 
     expect(root.querySelector('.editor-host')).toBeNull();
     expect(root.querySelector('[role="tablist"]')).toBeNull();
@@ -84,7 +87,7 @@ describe('App', () => {
 
   it('segnala le note illeggibili senza bloccare le altre', () => {
     ready([createNote('# Leggibile', 0)], undefined, ['a', 'b']);
-    render(<App />, root);
+    render(<Workspace />, root);
 
     expect(root.querySelector('.workspace-warning')?.textContent).toContain(
       '2 note non si possono',
@@ -94,15 +97,70 @@ describe('App', () => {
 
   it('durante un aggiornamento bloccato spiega cosa fare', () => {
     notesState.value = { status: 'loading', message: "Chiudi l'altra scheda" };
-    render(<App />, root);
+    render(<Workspace />, root);
 
     expect(root.querySelector('.workspace')?.textContent).toContain("Chiudi l'altra scheda");
   });
 
   it("se l'archivio non si apre mostra il motivo", () => {
     notesState.value = { status: 'error', message: 'Archivio bloccato' };
-    render(<App />, root);
+    render(<Workspace />, root);
 
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('Archivio bloccato');
+  });
+});
+
+describe('App', () => {
+  let root: HTMLElement;
+
+  beforeEach(() => {
+    root = document.createElement('div');
+    document.body.append(root);
+  });
+
+  afterEach(() => {
+    render(null, root);
+    root.remove();
+    vaultState.value = { status: 'opening' };
+  });
+
+  it('al primo avvio chiede di creare la passphrase, senza aree delle note', () => {
+    vaultState.value = { status: 'setup', legacy: true };
+    render(<App />, root);
+
+    expect(root.querySelector('h1')?.textContent).toBe('Proteggi le tue note');
+    expect(root.textContent).toContain('Le note già presenti verranno cifrate');
+    const fields = root.querySelectorAll('input');
+    expect([...fields].map((f) => f.getAttribute('autocomplete'))).toEqual([
+      'new-password',
+      'new-password',
+    ]);
+    expect([...fields].every((f) => f.type === 'password')).toBe(true);
+    expect(root.querySelector('.editor-host')).toBeNull();
+    expect(root.textContent).toContain('le note sono perse');
+  });
+
+  it('bloccata mostra lo sblocco con il motivo del blocco', async () => {
+    vaultState.value = { status: 'locked', message: 'Note bloccate per inattività.' };
+    render(<App />, root);
+
+    expect(root.querySelector('h1')?.textContent).toBe('Note bloccate');
+    // Il motivo descrive il campo, che prende il focus: un lettore di schermo lo legge subito.
+    expect(root.querySelector('#unlock-reason')?.textContent).toBe('Note bloccate per inattività.');
+    const field = root.querySelector('input');
+    expect(field?.getAttribute('autocomplete')).toBe('current-password');
+    expect(field?.getAttribute('aria-describedby')).toBe('unlock-reason unlock-error');
+    await vi.waitFor(() => expect(document.activeElement).toBe(field));
+    const toggle = root.querySelector<HTMLButtonElement>('.show-toggle');
+    expect(toggle?.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it("se l'archivio non si apre lo spiega nella schermata di blocco", () => {
+    vaultState.value = { status: 'error', message: 'Archivio bloccato' };
+    render(<App />, root);
+
+    expect(root.querySelector('.workspace [role="alert"]')?.textContent).toContain(
+      'Archivio bloccato',
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waitForPendingSaves } from './support';
+import { openUnlocked, reloadUnlocked, waitForPendingSaves } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
@@ -7,7 +7,7 @@ const editor = (page: Page) => page.getByRole('textbox', { name: 'Testo della no
 const tabs = (page: Page) => page.getByRole('tablist', { name: 'Note aperte' }).getByRole('tab');
 
 async function openApp(page: Page) {
-  await page.goto('/');
+  await openUnlocked(page);
   await expect(editor(page)).toContainText('Nota di esempio');
 }
 
@@ -32,7 +32,7 @@ test('una nota nuova si apre in una scheda col titolo pronto da riscrivere', asy
 
   // Dopo il ricaricamento schede e testo salvato sono ancora lì.
   await expect(page.locator('.save-state')).toHaveText(/^Salvato alle/);
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(tabs(page)).toHaveCount(2);
   await expect(tabs(page).nth(1)).toHaveAttribute('aria-selected', 'true');
   await expect(tabs(page).nth(1)).toHaveText('Preventivo per il cliente R...');
@@ -65,7 +65,7 @@ test('le schede si usano da tastiera e chiuderle non elimina le note', async ({ 
   await expect(page.getByRole('button', { name: '+ Nuova nota' })).toBeFocused();
 
   // Le note sono ancora nell'archivio e si riaprono, anche dopo un ricaricamento.
-  await page.reload();
+  await reloadUnlocked(page);
   const reopen = page.getByRole('list', { name: "Note nell'archivio" }).getByRole('button');
   await expect(reopen).toHaveCount(2);
   await reopen.filter({ hasText: 'Nota di esempio' }).click();

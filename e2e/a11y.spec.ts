@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { openUnlocked } from './support';
 
 test('il menu si usa da tastiera e restituisce il focus al pulsante', async ({ page }) => {
-  await page.goto('/');
+  await openUnlocked(page);
   const trigger = page.getByRole('button', { name: 'Altro' });
 
   await trigger.focus();
@@ -22,7 +23,7 @@ test('il menu si usa da tastiera e restituisce il focus al pulsante', async ({ p
 for (const how of ['Escape', 'Chiudi', 'sfondo'] as const) {
   test(`chiudendo le impostazioni con ${how} il focus torna su "Altro"`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto('/');
+    await openUnlocked(page);
     const trigger = page.getByRole('button', { name: 'Altro' });
     await trigger.click();
     await page.getByRole('menuitem', { name: 'Impostazioni' }).click();
@@ -39,7 +40,7 @@ for (const how of ['Escape', 'Chiudi', 'sfondo'] as const) {
 }
 
 test('con le impostazioni aperte il Tab resta dentro il pannello', async ({ page }) => {
-  await page.goto('/');
+  await openUnlocked(page);
   await page.getByRole('button', { name: 'Altro' }).click();
   await page.getByRole('menuitem', { name: 'Impostazioni' }).click();
   const dialog = page.getByRole('dialog', { name: 'Impostazioni' });

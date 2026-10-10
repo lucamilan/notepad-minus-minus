@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { openUnlocked, reloadUnlocked } from './support';
 
 test('il tema scelto nelle impostazioni resta dopo il ricaricamento', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
-  await page.goto('/');
+  await openUnlocked(page);
   const html = page.locator('html');
   await expect(html).not.toHaveAttribute('data-theme');
 
@@ -15,7 +16,7 @@ test('il tema scelto nelle impostazioni resta dopo il ricaricamento', async ({ p
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 
-  await page.reload();
+  await reloadUnlocked(page);
   await expect(html).toHaveAttribute('data-theme', 'dark');
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     'rgb(15, 19, 23)',

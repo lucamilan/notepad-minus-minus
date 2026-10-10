@@ -209,8 +209,24 @@ export function startAutosaveLifecycle(target: Window = window): () => void {
   };
 }
 
-/** Solo per i test. */
-export function resetAutosaveForTests(): void {
+/**
+ * Al blocco: prova a scrivere tutto ciò che è in coda e restituisce le note rimaste, cioè
+ * quelle la cui scrittura è fallita e quelle trattenute in attesa della scelta tra schede:
+ * il chiamante le cifra e le scrive dopo il prossimo sblocco. Poi la coda si svuota, così in
+ * memoria non resta testo.
+ */
+export async function drainSavesForLock(): Promise<{ note: Note; held: boolean }[]> {
+  await flushSaves();
+  while (running) await running;
+  const left = [...pending.values()]
+    .filter((note) => !discarded.has(note.id))
+    .map((note) => ({ note, held: held.has(note.id) }));
+  resetAutosaveForLock();
+  return left;
+}
+
+/** Svuota coda, stati e timer (al blocco, e nei test). */
+export function resetAutosaveForLock(): void {
   clearTimeout(timer);
   timer = undefined;
   pending.clear();
@@ -221,3 +237,6 @@ export function resetAutosaveForTests(): void {
   lastSavedAt = null;
   saveStatus.value = { state: 'saved', at: null };
 }
+
+/** Solo per i test. */
+export const resetAutosaveForTests = resetAutosaveForLock;

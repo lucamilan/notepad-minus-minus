@@ -1,0 +1,185 @@
+/* Passphrase: schermate di blocco, campi, dialoghi di sicurezza (F7). Colori dai token di app.css. */
+
+.vault-app {
+  grid-template-rows: auto 1fr;
+}
+
+.workspace.vault {
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.vault-card {
+  width: min(440px, calc(100% - 32px));
+  margin: 48px auto 32px;
+  padding: 28px 28px 24px;
+  display: grid;
+  gap: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.vault-card h1 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 1.45rem;
+  letter-spacing: -0.01em;
+}
+
+.vault-card > p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.vault-icon {
+  color: var(--accent);
+}
+
+.vault-info {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.vault-card > p.vault-info {
+  color: var(--ink);
+}
+
+.vault-form {
+  display: grid;
+  gap: 10px;
+}
+
+.vault-form .primary {
+  justify-self: start;
+  padding: 8px 20px;
+}
+
+.vault-form .primary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.vault-field {
+  display: grid;
+  gap: 4px;
+}
+
+.vault-field label {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.vault-field input,
+.drawer-field select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 10px;
+  min-width: 0;
+}
+
+.vault-field input:focus-visible,
+.drawer-field select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+
+.vault-field input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.vault-field input[readonly] {
+  opacity: 0.7;
+}
+
+.show-toggle {
+  justify-self: start;
+}
+
+.show-toggle[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.vault-warning {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--warn-soft);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.forgot {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+/* Dialoghi: testo descrittivo, avviso di attesa, cambio passphrase */
+.confirm-text p {
+  margin: 0 0 10px;
+}
+
+.confirm form > .vault-field {
+  margin-bottom: 14px;
+}
+
+.confirm-status,
+.confirm .form-error {
+  margin: 0 0 14px;
+}
+
+.confirm .vault-warning,
+.confirm .hint {
+  margin: 0;
+}
+
+.passphrase-dialog .vault-form .confirm-actions {
+  margin-top: 6px;
+}
+
+/* Impostazioni: sezione Sicurezza e dati della v1 */
+.group-title {
+  margin: 0;
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.drawer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.drawer-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.change-status:empty {
+  margin: 0;
+}

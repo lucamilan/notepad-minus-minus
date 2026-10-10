@@ -74,7 +74,7 @@ describe('plainCodec', () => {
 describe('database', () => {
   it('crea lo schema alla versione corrente, senza indici sui contenuti', async () => {
     const db = await openNotepadDb();
-    expect(db.name).toBe('notepad-minus-minus');
+    expect(db.name).toBe('notepad-minus-minus-cifrato');
     expect(db.version).toBe(DB_VERSION);
     expect([...db.objectStoreNames].sort()).toEqual(['meta', 'notes']);
     expect([...db.transaction('notes').store.indexNames]).toEqual([]);
