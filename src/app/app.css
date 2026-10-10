@@ -1,4 +1,4 @@
-/* Layout: barra · avviso · area di lavoro · barra di stato; i pannelli raccolta e schede arrivano in F3/F6. */
+/* Layout: barra · avviso · area di lavoro (schede + nota) · barra di stato; la raccolta arriva in F6. */
 :root {
   --bg: #e9ecf0;
   --bar: #ffffff;
@@ -101,6 +101,8 @@ button {
 .app {
   height: 100%;
   display: grid;
+  /* minmax(0, …): le schede scorrono dentro la propria barra invece di allargare la pagina. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto 1fr auto;
   position: relative;
 }
@@ -242,9 +244,189 @@ button {
   background: var(--paper);
 }
 
-.workspace > .editor-host {
+/* Schede: scorre solo l'elenco, così "+ Nuova nota" resta sempre visibile. La linea di base
+   è un'ombra interna che la scheda attiva (sfondo --paper) copre, senza sporgere di 1px. */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  padding: 8px 12px 0;
+  background: var(--bg);
+  box-shadow: inset 0 -1px var(--line);
+}
+
+.tablist {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  max-width: 260px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  color: var(--muted);
+}
+
+.tab.is-active {
+  background: var(--paper);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: 7px 0 0 0;
+  padding: 6px 4px 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tab:hover .tab-label {
+  color: var(--ink);
+}
+
+.tab.is-active .tab-label {
+  font-weight: 500;
+}
+
+.tab-label:focus-visible {
+  outline-offset: -2px;
+}
+
+.tab-close {
+  flex: none;
+  margin-right: 4px;
+  padding: 2px 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tab-close:hover {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.tab-new {
+  flex: none;
+  margin: 0 0 6px 6px;
+  padding: 3px 11px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab-new:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.note-panel {
   flex: 1;
   min-height: 0;
+}
+
+/* Nessuna scheda aperta */
+.empty {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 12px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty h2 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 1.2rem;
+  color: var(--ink);
+}
+
+.empty p {
+  margin: 0;
+  max-width: 44ch;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  padding: 6px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary:hover {
+  filter: brightness(1.08);
+}
+
+.reopen {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  width: min(420px, 100%);
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.reopen button {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reopen button:hover {
+  border-color: var(--accent);
+}
+
+.reopen-title {
+  color: var(--ink);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reopen-date {
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
 }
 
 .workspace-warning {

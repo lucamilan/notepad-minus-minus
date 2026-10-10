@@ -11,6 +11,38 @@ export interface Note {
 export const SAMPLE_NOTE_TEXT = `# Nota di esempio
 Puoi scrivere la nota usando la sintassi *Markdown* di base.`;
 
+/** Testo di una nota nuova: il titolo (caratteri 2–12) viene selezionato per riscriverlo subito. */
+export const NEW_NOTE_TEXT = '# Nuova nota\n\n';
+export const NEW_NOTE_TITLE_RANGE = { anchor: 2, head: 12 } as const;
+
+export const UNTITLED = 'Nota senza titolo';
+const TAB_TITLE_MAX = 27;
+
+/**
+ * Titolo della nota: la prima riga non vuota, senza la sintassi Markdown più comune
+ * (titoli, citazioni, elenchi, attività, link, enfasi). Come nella v1.
+ */
+export function noteTitle(text: string): string {
+  const firstLine = text.trim().split(/\r\n|\r|\n/, 1)[0] ?? '';
+  const plain = firstLine
+    .replace(/^#{1,6}(?:\s+|$)/, '')
+    .replace(/^>\s*/, '')
+    .replace(/^(?:[-+*]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/, '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_~`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain || UNTITLED;
+}
+
+/** Titolo della scheda: al massimo 27 caratteri più "...", senza spezzare le emoji. */
+export function tabTitle(text: string): string {
+  const chars = Array.from(noteTitle(text));
+  return chars.length <= TAB_TITLE_MAX
+    ? chars.join('')
+    : `${chars.slice(0, TAB_TITLE_MAX).join('')}...`;
+}
+
 export function createNote(
   text: string,
   now: number = Date.now(),
