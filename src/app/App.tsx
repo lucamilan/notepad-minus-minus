@@ -1,15 +1,13 @@
 import { useComputed, useSignal } from '@preact/signals';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Editor } from '../features/editor/Editor';
+import type { Note } from '../features/notes/note';
+import { notesState } from '../features/notes/store';
 import { SettingsDrawer } from '../features/settings/SettingsDrawer';
 import { AppBar } from './AppBar';
 import { InfoIcon } from './icons';
 
-const SAMPLE_NOTE = `# Nota di esempio
-Puoi scrivere la nota usando la sintassi *Markdown* di base.
-
-Questa è un'anteprima di sviluppo di Notepad−− v2: l'editor funziona,
-ma il testo non viene ancora salvato.`;
+const DATE_FORMAT = new Intl.DateTimeFormat('it-IT', { dateStyle: 'short', timeStyle: 'short' });
 
 function countWords(text: string): number {
   const trimmed = text.trim();
@@ -40,22 +38,65 @@ export function App() {
       <p class="notice" role="note">
         <InfoIcon />
         <span>
-          Anteprima di sviluppo: il salvataggio non c'è ancora. Quello che scrivi si perde quando
-          chiudi o ricarichi la pagina.
+          Anteprima di sviluppo: le note si aprono dall'archivio del browser, ma le modifiche non
+          vengono ancora salvate e si perdono quando chiudi o ricarichi la pagina.
         </span>
       </p>
       <main class="workspace">
-        <Editor
-          initialText={SAMPLE_NOTE}
-          label="Testo della nota"
-          onChange={(value) => (text.value = value)}
-        />
+        <Workspace onTextChange={(value) => (text.value = value)} />
       </main>
       <footer class="status">
-        <span class="unsaved">Non salvato</span>
+        <span class="unsaved">Modifiche non salvate</span>
         <span>{stats}</span>
+        <CreatedAt />
       </footer>
       {settingsOpen && <SettingsDrawer onClose={closeSettings} />}
     </div>
   );
+}
+
+function firstNote(): Note | undefined {
+  const state = notesState.value;
+  return state.status === 'ready' ? state.notes[0] : undefined;
+}
+
+function Workspace({ onTextChange }: { onTextChange: (text: string) => void }) {
+  const state = notesState.value;
+  if (state.status === 'loading') {
+    return <p class="workspace-message">{state.message ?? 'Apertura delle note…'}</p>;
+  }
+  if (state.status === 'error') {
+    return (
+      <div class="workspace-message" role="alert">
+        <h1>Impossibile aprire le note</h1>
+        <p>{state.message}</p>
+      </div>
+    );
+  }
+  const note = state.notes[0];
+  const unreadable = state.unreadable.length;
+  return (
+    <>
+      {unreadable > 0 && (
+        <p class="workspace-warning" role="status">
+          {unreadable === 1
+            ? '1 nota non si può leggere: è stata lasciata intatta nell’archivio.'
+            : `${unreadable} note non si possono leggere: sono state lasciate intatte nell’archivio.`}
+        </p>
+      )}
+      {note && (
+        <Editor
+          key={note.id}
+          initialText={note.text}
+          label="Testo della nota"
+          onChange={onTextChange}
+        />
+      )}
+    </>
+  );
+}
+
+function CreatedAt() {
+  const note = firstNote();
+  return note ? <span>Creata il {DATE_FORMAT.format(note.createdAt)}</span> : null;
 }

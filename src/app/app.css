@@ -232,11 +232,44 @@ button {
 /* Area di lavoro */
 .workspace {
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--paper);
+}
+
+.workspace > .editor-host {
+  flex: 1;
+  min-height: 0;
+}
+
+.workspace-warning {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  background: var(--warn-soft);
+  border-bottom: 1px solid var(--line);
 }
 
 .editor-host {
   height: 100%;
+}
+
+.workspace-message {
+  margin: 0;
+  padding: 32px 24px;
+  max-width: 60ch;
+  color: var(--muted);
+}
+
+.workspace-message h1 {
+  margin: 0 0 8px;
+  font-family: var(--f-display);
+  font-size: 1.3rem;
+  color: var(--ink);
+}
+
+.workspace-message p {
+  margin: 0;
 }
 
 /* Barra di stato */
