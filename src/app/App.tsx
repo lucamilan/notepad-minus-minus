@@ -34,22 +34,26 @@ export function App() {
 
   return (
     <div class="app">
-      <AppBar menuButtonRef={menuButtonRef} onOpenSettings={openSettings} />
-      <p class="notice" role="note">
-        <InfoIcon />
-        <span>
-          Anteprima di sviluppo: le note si aprono dall'archivio del browser, ma le modifiche non
-          vengono ancora salvate e si perdono quando chiudi o ricarichi la pagina.
-        </span>
-      </p>
-      <main class="workspace">
-        <Workspace onTextChange={(value) => (text.value = value)} />
-      </main>
-      <footer class="status">
-        <span class="unsaved">Modifiche non salvate</span>
-        <span>{stats}</span>
-        <CreatedAt />
-      </footer>
+      {/* Con un pannello modale aperto il resto è inerte in modo esplicito: showModal() da solo
+          non esclude sempre dal Tab il contenuto nello shadow root dell'editor (Chromium). */}
+      <div class="app-content" inert={settingsOpen}>
+        <AppBar menuButtonRef={menuButtonRef} onOpenSettings={openSettings} />
+        <p class="notice" role="note">
+          <InfoIcon />
+          <span>
+            Anteprima di sviluppo: le note si aprono dall'archivio del browser, ma le modifiche non
+            vengono ancora salvate e si perdono quando chiudi o ricarichi la pagina.
+          </span>
+        </p>
+        <main class="workspace">
+          <Workspace onTextChange={(value) => (text.value = value)} />
+        </main>
+        <footer class="status">
+          <span class="unsaved">Modifiche non salvate</span>
+          <span>{stats}</span>
+          <CreatedAt />
+        </footer>
+      </div>
       {settingsOpen && <SettingsDrawer onClose={closeSettings} />}
     </div>
   );

@@ -105,6 +105,11 @@ button {
   position: relative;
 }
 
+/* Contenitore trasparente per il layout: serve solo a rendere inerte l'app sotto i pannelli. */
+.app-content {
+  display: contents;
+}
+
 /* Barra superiore */
 .bar {
   display: flex;
