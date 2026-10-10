@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waitForPendingSaves } from './support';
+
+test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
 const editor = (page: Page) => page.getByRole('textbox', { name: 'Testo della nota' });
 const tabs = (page: Page) => page.getByRole('tablist', { name: 'Note aperte' }).getByRole('tab');
@@ -27,11 +30,12 @@ test('una nota nuova si apre in una scheda col titolo pronto da riscrivere', asy
   );
   await expect(page.locator('.status')).toContainText('Creata il');
 
-  // Dopo il ricaricamento le schede restano aperte (il testo si salverà da F4).
+  // Dopo il ricaricamento schede e testo salvato sono ancora lì.
+  await expect(page.locator('.save-state')).toHaveText(/^Salvato alle/);
   await page.reload();
   await expect(tabs(page)).toHaveCount(2);
   await expect(tabs(page).nth(1)).toHaveAttribute('aria-selected', 'true');
-  await expect(tabs(page).nth(1)).toHaveText('Nuova nota');
+  await expect(tabs(page).nth(1)).toHaveText('Preventivo per il cliente R...');
 });
 
 test('le schede si usano da tastiera e chiuderle non elimina le note', async ({ page }) => {
@@ -135,6 +139,14 @@ test('su mobile con molte schede la pagina non scorre e "+ Nuova nota" resta vis
     };
   });
   expect(layout).toEqual({ pageScrolls: false, barScrollsVertically: false });
+});
+
+test('un doppio clic su "+ Nuova nota" crea una sola nota', async ({ page }) => {
+  await openApp(page);
+  await page.getByRole('button', { name: '+ Nuova nota' }).dblclick();
+  await expect(tabs(page)).toHaveCount(2);
+  await page.waitForTimeout(300);
+  await expect(tabs(page)).toHaveCount(2);
 });
 
 test('il × chiude la scheda col mouse', async ({ page }) => {

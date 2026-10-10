@@ -33,7 +33,7 @@ describe('App', () => {
     render(<App />, root);
 
     expect(root.querySelector('.logo')?.textContent).toContain('Notepad−−');
-    expect(root.querySelector('.notice')?.textContent).toContain('le modifiche al testo non');
+    expect(root.querySelector('.notice')?.textContent).toContain('non sono ancora');
     expect(root.querySelector('.workspace')?.textContent).toContain('Apertura delle note');
   });
 

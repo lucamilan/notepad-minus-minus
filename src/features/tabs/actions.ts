@@ -1,4 +1,5 @@
 import { batch, signal } from '@preact/signals';
+import { discardPendingSave } from '../notes/autosave';
 import { createNote, NEW_NOTE_TEXT, NEW_NOTE_TITLE_RANGE } from '../notes/note';
 import { addNote, getRepository, notesState, removeNote } from '../notes/store';
 import {
@@ -49,6 +50,11 @@ export function closeTab(id: string): void {
   commit(withClosed(tabsState.value, id));
 }
 
+/** Secondo clic di un doppio clic: non deve creare un'altra nota. */
+export function isRepeatedClick(e: MouseEvent): boolean {
+  return e.detail > 1;
+}
+
 export function focusTabs(): void {
   tabFocusRequest.value++;
 }
@@ -67,18 +73,12 @@ export function cycleTabKeepingEditorFocus(delta: number): void {
   commit(next);
 }
 
-let creating: Promise<void> | null = null;
-
 /**
- * Crea una nota, la apre in una scheda nuova e la salva subito nell'archivio. Finché una
- * creazione è in corso le richieste successive (doppio clic, Alt+N ripetuto) non ne creano altre.
+ * Crea una nota, la apre in una scheda nuova e la salva subito nell'archivio. Ogni chiamata
+ * crea una nota: doppio clic e tasto tenuto premuto li filtrano i chiamanti (`isRepeatedClick`,
+ * `e.repeat`), perché due Alt+N rapidi sono due note volute anche se la prima è ancora in scrittura.
  */
-export function createNoteInNewTab(now: number = Date.now()): Promise<void> {
-  creating ??= create(now).finally(() => (creating = null));
-  return creating;
-}
-
-async function create(now: number): Promise<void> {
+export async function createNoteInNewTab(now: number = Date.now()): Promise<void> {
   if (notesState.value.status !== 'ready') return;
   const note = createNote(NEW_NOTE_TEXT, now);
   // La scheda si apre prima che l'archivio confermi: chi preme Alt+N e scrive subito
@@ -97,6 +97,7 @@ async function create(now: number): Promise<void> {
     batch(() => {
       closeTab(note.id);
       removeNote(note.id);
+      discardPendingSave(note.id);
       actionError.value =
         error instanceof DOMException && error.name === 'QuotaExceededError'
           ? 'Spazio di archiviazione esaurito: la nuova nota non è stata creata.'

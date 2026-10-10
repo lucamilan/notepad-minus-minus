@@ -75,7 +75,9 @@ test('se un’altra scheda aggiorna l’archivio, questa chiede di ricaricare', 
     DB_NAME,
   );
   expect(upgraded).toBeGreaterThan(1);
-  await expect(page.getByRole('alert')).toContainText('Ricarica questa pagina');
+  await expect(page.locator('.workspace').getByRole('alert')).toContainText(
+    'Ricarica questa pagina',
+  );
 });
 
 test('se IndexedDB non è disponibile mostra un messaggio chiaro', async ({ page }) => {
@@ -91,7 +93,9 @@ test('se IndexedDB non è disponibile mostra un messaggio chiaro', async ({ page
     if (msg.type() === 'error') errors.push(msg.text());
   });
   await page.goto('/');
-  await expect(page.getByRole('alert')).toContainText('non permette di salvare dati');
+  await expect(page.locator('.workspace').getByRole('alert')).toContainText(
+    'non permette di salvare dati',
+  );
   // L'errore originale finisce in console per chi indaga (il testo varia da browser a browser).
   expect(errors.length).toBeGreaterThan(0);
 });
