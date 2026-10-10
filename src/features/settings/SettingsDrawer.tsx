@@ -5,6 +5,7 @@ import { AUTO_LOCK_OPTIONS, autoLockMinutes, isAutoLockMinutes } from '../crypto
 import { ChangePassphraseDialog } from '../crypto/ChangePassphraseDialog';
 import { deleteLegacyLeftover, legacyLeftover } from '../crypto/legacy';
 import { lockVault } from '../crypto/vault';
+import type { TransferKind } from '../transfer/TransferDialog';
 import { themePreference, type ThemePreference } from './theme';
 import { deleteV1Data, v1DataExists } from './v1Data';
 
@@ -16,11 +17,13 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
 
 interface SettingsDrawerProps {
   onClose: () => void;
+  /** Apre esportazione o importazione sopra il pannello (dialoghi resi da Workspace). */
+  onOpenTransfer: (kind: TransferKind) => void;
 }
 
 // <dialog> nativo aperto con showModal(): il resto della pagina diventa inerte (Tab resta
 // nel pannello) ed Escape genera "cancel". Il focus al chiudere lo riporta chi apre il pannello.
-export function SettingsDrawer({ onClose }: SettingsDrawerProps) {
+export function SettingsDrawer({ onClose, onOpenTransfer }: SettingsDrawerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -74,6 +77,7 @@ export function SettingsDrawer({ onClose }: SettingsDrawerProps) {
           <p class="hint">"Sistema" segue l'impostazione chiaro/scuro del computer.</p>
         </section>
         <SecuritySettings />
+        <TransferSettings onOpen={onOpenTransfer} />
         <LegacyLeftoverSettings />
         <V1DataSettings />
       </div>
@@ -126,6 +130,29 @@ function SecuritySettings() {
           }}
         />
       )}
+    </section>
+  );
+}
+
+/** Esportazione e importazione del file .notepad per spostare le note su un altro PC. */
+function TransferSettings({ onOpen }: { onOpen: (kind: TransferKind) => void }) {
+  return (
+    <section class="drawer-group" aria-labelledby="transfer-title">
+      <h3 id="transfer-title" class="group-title">
+        Trasferimento tra PC
+      </h3>
+      <p class="hint">
+        Le note si esportano in un file .notepad cifrato con una passphrase che scegli al momento
+        dell’esportazione: serve per importarle sull’altro PC.
+      </p>
+      <div class="drawer-row">
+        <button type="button" class="ghost" onClick={() => onOpen('export')}>
+          Esporta note…
+        </button>
+        <button type="button" class="ghost" onClick={() => onOpen('import')}>
+          Importa note…
+        </button>
+      </div>
     </section>
   );
 }

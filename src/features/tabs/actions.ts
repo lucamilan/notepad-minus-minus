@@ -3,7 +3,14 @@ import { collectionFilter } from '../collection/state';
 import { matchesFilter } from '../collection/views';
 import { discardPendingSave } from '../notes/autosave';
 import { createNote, NEW_NOTE_TEXT, NEW_NOTE_TITLE_RANGE } from '../notes/note';
-import { addNote, currentLockEpoch, getRepository, notesState, removeNote } from '../notes/store';
+import {
+  addNote,
+  currentLockEpoch,
+  getRepository,
+  markStored,
+  notesState,
+  removeNote,
+} from '../notes/store';
 import { ensureEditorVisible } from '../preview/viewMode';
 import {
   hiddenTabIds,
@@ -57,6 +64,13 @@ export function openTab(id: string): void {
 
 export function closeTab(id: string): void {
   commit(withClosed(tabsState.value, id));
+}
+
+/** Chiude più schede con un solo salvataggio dello stato (importazione, F8). */
+export function closeTabs(ids: Iterable<string>): void {
+  let next = tabsState.value;
+  for (const id of ids) next = withClosed(next, id);
+  commit(next);
 }
 
 /** Secondo clic di un doppio clic: non deve creare un'altra nota. */
@@ -117,6 +131,7 @@ export async function createNoteInNewTab(now: number = Date.now()): Promise<void
   const epoch = currentLockEpoch();
   try {
     await getRepository().put(note);
+    if (currentLockEpoch() === epoch) markStored([note]);
   } catch (error) {
     console.error(error);
     // Archivio chiuso (c'è già il messaggio) o note bloccate nel frattempo.

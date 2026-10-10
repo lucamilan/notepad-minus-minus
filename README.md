@@ -20,6 +20,18 @@ Le note si bloccano con <kbd>Alt</kbd>+<kbd>L</kbd> o il pulsante "Blocca" (in t
 
 La cifratura protegge le note salvate nel browser, non una sessione sbloccata: tutte le pagine sotto `lucamilan.github.io` condividono la stessa origine.
 
+## Spostare le note su un altro PC
+
+Le note restano nel browser in cui le scrivi. Per portarle su un altro PC (o in un altro browser):
+
+1. qui, dal menu "Altro" (o dalle impostazioni, sezione "Trasferimento tra PC") scegli **Esporta note…**, scrivi due volte una passphrase per il file (almeno 12 caratteri: può essere quella delle note, ma va riscritta) e salva il file `notepad-AAAA-MM-GG.notepad`;
+2. porta il file sull'altro PC (chiavetta, e-mail, cartella condivisa: è cifrato con AES-256-GCM e non contiene nulla in chiaro, nemmeno quante note ci sono);
+3. lì scegli **Importa note…**, il file e la sua passphrase, poi:
+   - **Unisci** (predefinito): aggiunge le note nuove; se una nota è su entrambi i PC resta la versione modificata più di recente; le viste salvate con un nome nuovo si aggiungono;
+   - **Sostituisci tutto**: elimina le note e le viste salvate di quel browser e mette quelle del file (chiede una conferma esplicita).
+
+Senza la passphrase del file non c'è modo di aprirlo. Le note illeggibili non si esportano e non vengono mai sovrascritte. Le note con modifiche non ancora salvate, o appena cambiate in un’altra scheda, restano come sono e l’esito le conta come "in conflitto".
+
 ## Sviluppo
 
 Serve Node 22.

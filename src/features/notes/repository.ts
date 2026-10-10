@@ -1,5 +1,5 @@
-import type { IDBPDatabase } from 'idb';
-import type { NoteCodec } from './codec';
+import type { IDBPDatabase, IDBPObjectStore } from 'idb';
+import type { NoteCodec, StoredNote } from './codec';
 import { KEYRING_META_KEY, type NotepadSchema } from './database';
 import { createNote, SAMPLE_NOTE_TEXT, sortNotes, type Note } from './note';
 
@@ -9,6 +9,17 @@ export interface NoteList {
   unreadable: string[];
 }
 
+export interface NoteSnapshot extends NoteList {
+  records: ReadonlyMap<string, StoredNote>;
+}
+
+export interface ImportChange {
+  put: readonly Note[];
+  remove: readonly string[];
+  expected: ReadonlyMap<string, StoredNote>;
+  meta?: { key: string; value: unknown };
+}
+
 export interface NoteRepository {
   list(): Promise<NoteList>;
   get(id: string): Promise<Note | undefined>;
@@ -16,6 +27,16 @@ export interface NoteRepository {
   /** Tutto o niente: se un record non si salva, nessuno viene salvato. */
   putMany(notes: readonly Note[]): Promise<void>;
   delete(id: string): Promise<void>;
+  /** Come list(), più i record grezzi letti: l'istantanea su cui si pianifica un'importazione. */
+  snapshot(): Promise<NoteSnapshot>;
+  /**
+   * Importazione (F8): elimina `remove`, scrive `put` e il dato di servizio `meta` in
+   * un'unica transazione su `notes` e `meta`, tutto o niente. Dentro la transazione ogni
+   * record da toccare si confronta con quello dell'istantanea (`expected`; assente = non
+   * c'era): se è cambiato nel frattempo (un'altra scheda) non si tocca e il suo id torna tra
+   * i `conflicts`. Chi chiama non deve mai passare id di record illeggibili.
+   */
+  applyImport(change: ImportChange): Promise<{ conflicts: string[] }>;
   /** Salva `note` solo se l'archivio è vuoto, in modo atomico anche con più schede aperte. */
   addIfEmpty(note: Note): Promise<boolean>;
   /**
@@ -30,18 +51,28 @@ export function createNoteRepository(
   db: IDBPDatabase<NotepadSchema>,
   codec: NoteCodec,
 ): NoteRepository {
+  async function snapshot(): Promise<NoteSnapshot> {
+    const stored = await db.getAll('notes');
+    const results = await Promise.allSettled(stored.map((s) => codec.decode(s)));
+    const notes: Note[] = [];
+    const unreadable: string[] = [];
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled') notes.push(result.value);
+      else unreadable.push(stored[i]?.id ?? '?');
+    });
+    return {
+      notes: sortNotes(notes),
+      unreadable,
+      records: new Map(stored.map((record) => [record.id, record])),
+    };
+  }
+
   return {
     async list() {
-      const stored = await db.getAll('notes');
-      const results = await Promise.allSettled(stored.map((s) => codec.decode(s)));
-      const notes: Note[] = [];
-      const unreadable: string[] = [];
-      results.forEach((result, i) => {
-        if (result.status === 'fulfilled') notes.push(result.value);
-        else unreadable.push(stored[i]?.id ?? '?');
-      });
-      return { notes: sortNotes(notes), unreadable };
+      const { notes, unreadable } = await snapshot();
+      return { notes, unreadable };
     },
+    snapshot,
     async get(id) {
       const stored = await db.get('notes', id);
       return stored ? codec.decode(stored) : undefined;
@@ -52,15 +83,38 @@ export function createNoteRepository(
     async putMany(notes) {
       // Si codifica prima di aprire la transazione: IndexedDB la chiude se si aspetta altro.
       const encoded = await Promise.all(notes.map((n) => codec.encode(n)));
-      const tx = db.transaction('notes', 'readwrite');
+      await writeAll(db, function* (store) {
+        for (const record of encoded) yield store.put(record);
+      });
+    },
+    async delete(id) {
+      await db.delete('notes', id);
+    },
+    async applyImport({ put, remove, expected, meta }) {
+      if (meta) assertNotKeyring(meta.key);
+      // Tutto si codifica prima di aprire la transazione: IndexedDB la chiude se si aspetta
+      // altro che le sue richieste.
+      const encoded = await Promise.all(put.map((n) => codec.encode(n)));
+      const encodedMeta = meta ? await codec.encodeMeta(meta.key, meta.value) : undefined;
+      const tx = db.transaction(['notes', 'meta'], 'readwrite');
+      const notesStore = tx.objectStore('notes');
       const pending: Promise<unknown>[] = [tx.done];
       try {
-        // Un record non valido può far lanciare put() subito, prima di qualsiasi await:
-        // in quel caso le scritture già accodate vanno annullate esplicitamente.
-        for (const record of encoded) pending.push(tx.store.put(record));
+        const targets = [...remove, ...encoded.map((record) => record.id)];
+        const reads = targets.map((id) => notesStore.get(id));
+        pending.push(...reads);
+        const current = await Promise.all(reads);
+        const conflicts = new Set(
+          targets.filter((id, i) => !sameRecord(current[i], expected.get(id))),
+        );
+        for (const id of remove) if (!conflicts.has(id)) pending.push(notesStore.delete(id));
+        for (const record of encoded) {
+          if (!conflicts.has(record.id)) pending.push(notesStore.put(record));
+        }
+        if (meta) pending.push(tx.objectStore('meta').put(encodedMeta, meta.key));
         await Promise.all(pending);
+        return { conflicts: [...conflicts] };
       } catch (error) {
-        // Le richieste annullate rifiutano con AbortError: l'errore utile è quello originale.
         for (const p of pending) p.catch(() => undefined);
         try {
           tx.abort();
@@ -69,9 +123,6 @@ export function createNoteRepository(
         }
         throw error;
       }
-    },
-    async delete(id) {
-      await db.delete('notes', id);
     },
     async addIfEmpty(note) {
       const encoded = await codec.encode(note);
@@ -101,6 +152,64 @@ export function createNoteRepository(
       await db.put('meta', encoded, key);
     },
   };
+}
+
+type NotesStore = IDBPObjectStore<NotepadSchema, ['notes'], 'notes', 'readwrite'>;
+
+/**
+ * Una transazione readwrite su `notes` con le richieste generate da `requests`, una alla
+ * volta: tutto o niente. Un record non valido può far lanciare una richiesta subito, prima di
+ * qualsiasi await: in quel caso quelle già accodate vanno annullate esplicitamente.
+ */
+async function writeAll(
+  db: IDBPDatabase<NotepadSchema>,
+  requests: (store: NotesStore) => Iterable<Promise<unknown>>,
+): Promise<void> {
+  const tx = db.transaction('notes', 'readwrite');
+  const pending: Promise<unknown>[] = [tx.done];
+  try {
+    for (const request of requests(tx.store)) pending.push(request);
+    await Promise.all(pending);
+  } catch (error) {
+    // Le richieste annullate rifiutano con AbortError: l'errore utile è quello originale.
+    for (const p of pending) p.catch(() => undefined);
+    try {
+      tx.abort();
+    } catch {
+      // La transazione era già stata annullata dal browser.
+    }
+    throw error;
+  }
+}
+
+function tagOf(value: unknown): string {
+  return Object.prototype.toString.call(value);
+}
+
+/**
+ * Stesso record grezzo (byte compresi)? Con il codec cifrato ogni scrittura ha un IV nuovo,
+ * quindi un record riscritto da un'altra scheda non è mai uguale all'istantanea.
+ */
+export function sameRecord(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  const tag = tagOf(a);
+  if (tag !== tagOf(b) || typeof a !== 'object' || a === null || b === null) return false;
+  if (tag === '[object ArrayBuffer]' || tag === '[object Uint8Array]') {
+    const x = new Uint8Array(a as ArrayBuffer);
+    const y = new Uint8Array(b as ArrayBuffer);
+    return x.length === y.length && x.every((byte, i) => byte === y[i]);
+  }
+  if (Array.isArray(a)) {
+    return Array.isArray(b) && a.length === b.length && a.every((v, i) => sameRecord(v, b[i]));
+  }
+  const ka = Object.keys(a);
+  const kb = Object.keys(b as object);
+  return (
+    ka.length === kb.length &&
+    ka.every((key) =>
+      sameRecord((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+    )
+  );
 }
 
 function assertNotKeyring(key: string): void {

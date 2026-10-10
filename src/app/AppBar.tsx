@@ -6,18 +6,20 @@ import { lockVault } from '../features/crypto/vault';
 import { notesState } from '../features/notes/store';
 import { ViewModeSwitch } from '../features/preview/ViewModeSwitch';
 import { openSearch } from '../features/search/state';
+import type { TransferKind } from '../features/transfer/TransferDialog';
 import { DeviceIcon, LockIcon, MoreIcon, SearchIcon, SidebarIcon } from './icons';
 
 interface AppBarProps {
   menuButtonRef: RefObject<HTMLButtonElement>;
   onOpenSettings: () => void;
+  onOpenTransfer: (kind: TransferKind) => void;
 }
 
 const MENU_ID = 'app-menu';
 
 // Menu secondo il pattern ARIA "menu button": all'apertura il focus va sulla prima voce,
 // frecce/Home/End per muoversi, Escape chiude e riporta il focus al pulsante.
-export function AppBar({ menuButtonRef, onOpenSettings }: AppBarProps) {
+export function AppBar({ menuButtonRef, onOpenSettings, onOpenTransfer }: AppBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const ready = notesState.value.status === 'ready';
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -146,6 +148,32 @@ export function AppBar({ menuButtonRef, onOpenSettings }: AppBarProps) {
         </button>
         {menuOpen && (
           <div id={MENU_ID} class="menu" role="menu" ref={menuRef} onKeyDown={onMenuKeyDown}>
+            {ready && (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onOpenTransfer('export');
+                  }}
+                >
+                  Esporta note…
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onOpenTransfer('import');
+                  }}
+                >
+                  Importa note…
+                </button>
+              </>
+            )}
             <button
               type="button"
               role="menuitem"

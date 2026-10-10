@@ -7,12 +7,17 @@ test('il menu si usa da tastiera e restituisce il focus al pulsante', async ({ p
 
   await trigger.focus();
   await page.keyboard.press('Enter');
-  const item = page.getByRole('menuitem', { name: 'Impostazioni' });
-  await expect(item).toBeFocused();
+  const first = page.getByRole('menuitem', { name: 'Esporta note…' });
+  await expect(first).toBeFocused();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
   await page.keyboard.press('ArrowDown');
-  await expect(item).toBeFocused();
+  await expect(page.getByRole('menuitem', { name: 'Importa note…' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('menuitem', { name: 'Impostazioni' })).toBeFocused();
+  // Dall'ultima voce si riparte dalla prima.
+  await page.keyboard.press('ArrowDown');
+  await expect(first).toBeFocused();
 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toBeHidden();

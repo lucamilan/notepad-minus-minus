@@ -1,6 +1,6 @@
 import { effect, signal } from '@preact/signals';
 import type { Note } from './note';
-import { getRepository, setBeforeCloseHook, updateNoteText } from './store';
+import { getRepository, markStored, setBeforeCloseHook, updateNoteText } from './store';
 
 /**
  * Salvataggio continuo, sempre attivo: ogni modifica si salva dopo SAVE_DELAY_MS di pausa,
@@ -150,6 +150,7 @@ async function write(batch: Note[]): Promise<void> {
     // nuovo, così non ricompare al prossimo avvio.
     for (const note of batch) if (discarded.has(note.id)) await repo.delete(note.id);
     lastSavedAt = Date.now();
+    markStored(batch.filter((note) => !discarded.has(note.id)));
     savedListener?.(batch.filter((note) => !discarded.has(note.id)));
     saveStatus.value = { state: 'saved', at: lastSavedAt };
   } catch (error) {

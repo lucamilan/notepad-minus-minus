@@ -37,6 +37,8 @@ import {
 } from '../features/tabs/actions';
 import { NOTE_PANEL_ID, noteTooltip, TabBar, tabElementId } from '../features/tabs/TabBar';
 import { tabsState } from '../features/tabs/tabs';
+import { TransferDialog, type TransferKind } from '../features/transfer/TransferDialog';
+import { deepActiveElement, focusAfterModal } from '../lib/focus';
 import { formatDateTime, formatTime } from '../lib/format';
 import { AppBar } from './AppBar';
 import { InfoIcon } from './icons';
@@ -99,6 +101,20 @@ export function Workspace() {
   const wasSettingsOpen = useRef(false);
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  // Esportazione o importazione (F8): dal menu "Altro" o dalle impostazioni.
+  const [transfer, setTransfer] = useState<TransferKind | null>(null);
+  const transferOpener = useRef<Element | null>(null);
+  const openTransfer = useCallback((kind: TransferKind) => {
+    transferOpener.current = deepActiveElement();
+    setTransfer(kind);
+  }, []);
+  const closeTransfer = useCallback(() => {
+    setTransfer(null);
+    // Dal menu la voce non c'è più: il focus torna sul pulsante "Altro".
+    const opener = transferOpener.current;
+    transferOpener.current = null;
+    focusAfterModal(() => (opener?.isConnected ? opener : menuButtonRef.current));
+  }, []);
 
   // Quando il pannello si chiude il focus torna al pulsante "Altro" da cui era stato aperto.
   useEffect(() => {
@@ -142,7 +158,14 @@ export function Workspace() {
   const deleting = deleteRequest.value;
   const noteToDelete = ready ? state.notes.find((note) => note.id === deleting) : undefined;
   const search = ready ? searchRequest.value : null;
-  const modalOpen = settingsOpen || search !== null || noteToDelete !== undefined;
+  const transferOpen = ready ? transfer : null;
+  // Archivio chiuso (aggiornamento da un'altra scheda, errore): il dialogo non torna da solo
+  // quando le note si riaprono.
+  useEffect(() => {
+    if (!ready) setTransfer(null);
+  }, [ready]);
+  const modalOpen =
+    settingsOpen || search !== null || noteToDelete !== undefined || transferOpen !== null;
 
   // Scorciatoie delle schede: solo con le note pronte e nessun pannello modale aperto.
   useEffect(() => {
@@ -201,7 +224,11 @@ export function Workspace() {
       {/* Con un pannello modale aperto il resto è inerte in modo esplicito: showModal() da solo
           non esclude sempre dal Tab il contenuto nello shadow root dell'editor (Chromium). */}
       <div class="app-content" inert={modalOpen}>
-        <AppBar menuButtonRef={menuButtonRef} onOpenSettings={openSettings} />
+        <AppBar
+          menuButtonRef={menuButtonRef}
+          onOpenSettings={openSettings}
+          onOpenTransfer={openTransfer}
+        />
         <p class="notice" role="note">
           <InfoIcon />
           <span>
@@ -215,9 +242,12 @@ export function Workspace() {
         <StatusBar />
       </div>
       <SaveAnnouncer />
-      {settingsOpen && <SettingsDrawer onClose={closeSettings} />}
+      {settingsOpen && <SettingsDrawer onClose={closeSettings} onOpenTransfer={openTransfer} />}
       {search && ready && <SearchDialog notes={state.notes} initialQuery={search.query} />}
       {noteToDelete && <DeleteDialog note={noteToDelete} />}
+      {transferOpen && (
+        <TransferDialog key={transferOpen} kind={transferOpen} onClose={closeTransfer} />
+      )}
     </div>
   );
 }

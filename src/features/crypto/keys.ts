@@ -24,17 +24,24 @@ export const PBKDF2_ITERATIONS = 600_000;
  */
 export const MIN_PBKDF2_ITERATIONS = 600_000;
 export const MAX_PBKDF2_ITERATIONS = 10_000_000;
-const SALT_BYTES = 16;
-const IV_BYTES = 12;
+export const SALT_BYTES = 16;
+export const IV_BYTES = 12;
 /** 32 byte di chiave più 16 di tag GCM. */
-const WRAPPED_KEY_BYTES = 48;
+export const WRAPPED_KEY_BYTES = 48;
 const KEYRING_VERSION = 1;
 const WRAP_AAD = new TextEncoder().encode('keyring\u0000v1');
 
-export interface Keyring {
-  version: 1;
+/**
+ * Una chiave AES-256-GCM cifrata con una KEK derivata da una passphrase: la usano il
+ * portachiavi (additional data `keyring\0v1`) e il file di esportazione (`export\0v1`, F8).
+ */
+export interface WrappedKey {
   kdf: { name: 'PBKDF2'; hash: 'SHA-256'; iterations: number; salt: Uint8Array<ArrayBuffer> };
   wrap: { iv: Uint8Array<ArrayBuffer>; key: Uint8Array<ArrayBuffer> };
+}
+
+export interface Keyring extends WrappedKey {
+  version: 1;
 }
 
 /**
@@ -95,14 +102,7 @@ export function parseKeyring(value: unknown, options: { minIterations?: number }
     throw new InvalidKeyringError('derivazione');
   }
   const iterations = kdf['iterations'];
-  if (
-    typeof iterations !== 'number' ||
-    !Number.isSafeInteger(iterations) ||
-    iterations < minIterations ||
-    iterations > MAX_PBKDF2_ITERATIONS
-  ) {
-    throw new InvalidKeyringError('iterazioni');
-  }
+  if (!validIterations(iterations, minIterations)) throw new InvalidKeyringError('iterazioni');
   const salt = bytesOf(kdf['salt'], SALT_BYTES);
   const iv = bytesOf(wrap['iv'], IV_BYTES);
   const key = bytesOf(wrap['key'], WRAPPED_KEY_BYTES);
@@ -112,6 +112,19 @@ export function parseKeyring(value: unknown, options: { minIterations?: number }
     kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations, salt },
     wrap: { iv, key },
   };
+}
+
+/** Iterazioni accettate leggendo dati salvati o importati: intero tra il minimo e il massimo. */
+export function validIterations(
+  value: unknown,
+  minIterations: number = MIN_PBKDF2_ITERATIONS,
+): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= minIterations &&
+    value <= MAX_PBKDF2_ITERATIONS
+  );
 }
 
 async function deriveKek(
@@ -135,39 +148,48 @@ async function deriveKek(
   );
 }
 
-async function wrapDataKey(
-  dataKey: CryptoKey,
+/**
+ * Cifra `key` (estraibile) con una KEK nuova derivata da `passphrase`: salt e IV nuovi.
+ * `aad` distingue l'uso (portachiavi o file di esportazione), così una chiave cifrata per un
+ * uso non si apre nell'altro.
+ */
+export async function wrapKeyWithPassphrase(
+  key: CryptoKey,
   passphrase: string,
   iterations: number,
-): Promise<Keyring> {
+  aad: Uint8Array<ArrayBuffer>,
+): Promise<WrappedKey> {
   const salt = randomBytes(SALT_BYTES);
   const iv = randomBytes(IV_BYTES);
   const kek = await deriveKek(passphrase, salt, iterations);
-  const wrapped = await crypto.subtle.wrapKey('raw', dataKey, kek, {
+  const wrapped = await crypto.subtle.wrapKey('raw', key, kek, {
     name: 'AES-GCM',
     iv,
-    additionalData: WRAP_AAD,
+    additionalData: aad,
   });
   return {
-    version: KEYRING_VERSION,
     kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations, salt },
     wrap: { iv, key: new Uint8Array(wrapped) },
   };
 }
 
-/** Una KEK sbagliata fa fallire l'autenticazione GCM di unwrapKey: passphrase errata. */
-async function unwrapDataKey(
-  keyring: Keyring,
+/**
+ * Chiave AES-256-GCM (encrypt/decrypt) cifrata da wrapKeyWithPassphrase. Una KEK sbagliata
+ * fa fallire l'autenticazione GCM di unwrapKey: WrongPassphraseError.
+ */
+export async function unwrapKeyWithPassphrase(
+  wrapped: WrappedKey,
   passphrase: string,
+  aad: Uint8Array<ArrayBuffer>,
   extractable: boolean,
 ): Promise<CryptoKey> {
-  const kek = await deriveKek(passphrase, keyring.kdf.salt, keyring.kdf.iterations);
+  const kek = await deriveKek(passphrase, wrapped.kdf.salt, wrapped.kdf.iterations);
   try {
     return await crypto.subtle.unwrapKey(
       'raw',
-      keyring.wrap.key,
+      wrapped.wrap.key,
       kek,
-      { name: 'AES-GCM', iv: keyring.wrap.iv, additionalData: WRAP_AAD },
+      { name: 'AES-GCM', iv: wrapped.wrap.iv, additionalData: aad },
       { name: 'AES-GCM', length: 256 },
       extractable,
       ['encrypt', 'decrypt'],
@@ -175,6 +197,23 @@ async function unwrapDataKey(
   } catch {
     throw new WrongPassphraseError();
   }
+}
+
+async function wrapDataKey(
+  dataKey: CryptoKey,
+  passphrase: string,
+  iterations: number,
+): Promise<Keyring> {
+  const wrapped = await wrapKeyWithPassphrase(dataKey, passphrase, iterations, WRAP_AAD);
+  return { version: KEYRING_VERSION, ...wrapped };
+}
+
+function unwrapDataKey(
+  keyring: Keyring,
+  passphrase: string,
+  extractable: boolean,
+): Promise<CryptoKey> {
+  return unwrapKeyWithPassphrase(keyring, passphrase, WRAP_AAD, extractable);
 }
 
 /**

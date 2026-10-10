@@ -19,7 +19,8 @@ export const LEGACY_DB_NAME = 'notepad-minus-minus';
 
 /** L'area delle note è pronta (la barra di stato c'è solo da sbloccate). */
 async function expectUnlocked(page: Page): Promise<void> {
-  await expect(page.locator('footer.status')).toBeVisible();
+  // PBKDF2 (600.000 iterazioni) con molti test in parallelo può superare i 5 s predefiniti.
+  await expect(page.locator('footer.status')).toBeVisible({ timeout: 20_000 });
 }
 
 /** Prima apertura: crea la passphrase. */
