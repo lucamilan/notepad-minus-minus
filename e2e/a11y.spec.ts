@@ -44,12 +44,17 @@ test('con le impostazioni aperte il Tab resta dentro il pannello', async ({ page
   await page.getByRole('menuitem', { name: 'Impostazioni' }).click();
   const dialog = page.getByRole('dialog', { name: 'Impostazioni' });
 
+  // Uscendo dall'ultimo elemento il browser può portare il focus sulla propria interfaccia
+  // (activeElement = body o html): conta solo che non arrivi a elementi della pagina sotto.
   for (let i = 0; i < 6; i++) {
     await page.keyboard.press('Tab');
-    const inside = await page.evaluate(
-      () => !!document.activeElement?.closest('dialog') || document.activeElement === document.body,
-    );
-    expect(inside).toBe(true);
+    const focused = await page.evaluate(() => {
+      const el = document.activeElement;
+      if (!el || el === document.body || el === document.documentElement) return 'browser';
+      if (el.closest('dialog')) return 'dialog';
+      return `${el.tagName.toLowerCase()}.${el.className}`;
+    });
+    expect(['dialog', 'browser'], `focus finito su ${focused}`).toContain(focused);
   }
   await expect(dialog).toBeVisible();
 });
