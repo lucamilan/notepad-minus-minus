@@ -1,7 +1,8 @@
 import { signal } from '@preact/signals';
+import { hiddenTabIds, hiddenTabs, restoreTabs, TABS_META_KEY, tabsState } from '../tabs/tabs';
 import { plainCodec } from './codec';
 import { openNotepadDb, type ConnectionEvents } from './database';
-import type { Note } from './note';
+import { sortNotes, type Note } from './note';
 import { createNoteRepository, loadNotesEnsuringOne, type NoteRepository } from './repository';
 
 export type NotesState =
@@ -67,7 +68,14 @@ async function load(open: Opener): Promise<void> {
   try {
     const repo = await open(events);
     const { notes, unreadable } = await loadNotesEnsuringOne(repo);
+    const savedTabs = await repo.getMeta(TABS_META_KEY);
     repository = repo;
+    // Le schede prima delle note: l'interfaccia "pronta" deve già sapere quale nota mostrare.
+    hiddenTabIds.current = hiddenTabs(savedTabs, unreadable);
+    tabsState.value = restoreTabs(
+      savedTabs,
+      notes.map((note) => note.id),
+    );
     notesState.value = { status: 'ready', notes, unreadable };
   } catch (error) {
     console.error(error);
@@ -88,9 +96,40 @@ async function openDefault(events: ConnectionEvents): Promise<NoteRepository> {
   return createNoteRepository(await openNotepadDb(events), plainCodec);
 }
 
+/** Aggiunge in memoria una nota appena salvata nell'archivio. */
+export function addNote(note: Note): void {
+  const state = notesState.value;
+  if (state.status !== 'ready') return;
+  notesState.value = { ...state, notes: sortNotes([...state.notes, note]) };
+}
+
+/** Toglie dalla memoria una nota (per esempio una creazione non riuscita). */
+export function removeNote(id: string): void {
+  const state = notesState.value;
+  if (state.status !== 'ready') return;
+  notesState.value = { ...state, notes: state.notes.filter((note) => note.id !== id) };
+}
+
+/**
+ * Aggiorna in memoria il testo di una nota aperta, così titolo della scheda e statistiche
+ * seguono l'editor. Il salvataggio nell'archivio arriva con F4.
+ */
+export function updateNoteText(id: string, text: string): void {
+  const state = notesState.value;
+  if (state.status !== 'ready') return;
+  const index = state.notes.findIndex((note) => note.id === id);
+  const current = state.notes[index];
+  if (!current || current.text === text) return;
+  const notes = [...state.notes];
+  notes[index] = { ...current, text };
+  notesState.value = { ...state, notes };
+}
+
 /** Solo per i test: dimentica l'inizializzazione precedente. */
 export function resetNotesStoreForTests(): void {
   repository = undefined;
   initialization = undefined;
   notesState.value = { status: 'loading' };
+  tabsState.value = { open: [], active: null };
+  hiddenTabIds.current = [];
 }

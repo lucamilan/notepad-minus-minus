@@ -8,6 +8,8 @@ Blocco note che vive solo nel browser: le note sono cifrate con una passphrase e
 
 La versione 2 è in costruzione, una fase alla volta: il piano è in [docs/piano-v2.md](docs/piano-v2.md).
 
+Scorciatoie da tastiera: <kbd>Alt</kbd>+<kbd>N</kbd> nuova nota, <kbd>Alt</kbd>+<kbd>W</kbd> chiude la scheda (la nota resta nell'archivio), <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> cambia scheda; sulle schede <kbd>←</kbd>/<kbd>→</kbd> per spostarsi e <kbd>Canc</kbd> per chiudere.
+
 La versione 1 (Blazor WebAssembly, .NET 7) è archiviata nel branch [`legacy/blazor-net7`](https://github.com/lucamilan/notepad-minus-minus/tree/legacy/blazor-net7), tag `v1-blazor-final`.
 
 ## Sviluppo

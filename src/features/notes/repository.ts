@@ -18,6 +18,9 @@ export interface NoteRepository {
   delete(id: string): Promise<void>;
   /** Salva `note` solo se l'archivio è vuoto, in modo atomico anche con più schede aperte. */
   addIfEmpty(note: Note): Promise<boolean>;
+  /** Dati di servizio nello store `meta`, in chiaro: mai testo o date delle note. */
+  getMeta(key: string): Promise<unknown>;
+  putMeta(key: string, value: unknown): Promise<void>;
 }
 
 export function createNoteRepository(
@@ -76,6 +79,12 @@ export function createNoteRepository(
       if (empty) await tx.store.put(encoded);
       await tx.done;
       return empty;
+    },
+    getMeta(key) {
+      return db.get('meta', key);
+    },
+    async putMeta(key, value) {
+      await db.put('meta', value, key);
     },
   };
 }

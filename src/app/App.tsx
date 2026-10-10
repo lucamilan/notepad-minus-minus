@@ -1,28 +1,51 @@
-import { useComputed, useSignal } from '@preact/signals';
+import { useComputed } from '@preact/signals';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Editor } from '../features/editor/Editor';
-import type { Note } from '../features/notes/note';
-import { notesState } from '../features/notes/store';
+import { noteTitle, type Note } from '../features/notes/note';
+import { notesState, updateNoteText } from '../features/notes/store';
 import { SettingsDrawer } from '../features/settings/SettingsDrawer';
+import {
+  actionError,
+  closeActiveTab,
+  createNoteInNewTab,
+  cycleTabKeepingEditorFocus,
+  editorFocusRequest,
+  focusTabs,
+  openTab,
+} from '../features/tabs/actions';
+import { NOTE_PANEL_ID, noteTooltip, TabBar, tabElementId } from '../features/tabs/TabBar';
+import { tabsState } from '../features/tabs/tabs';
+import { formatDateTime } from '../lib/format';
 import { AppBar } from './AppBar';
 import { InfoIcon } from './icons';
-
-const DATE_FORMAT = new Intl.DateTimeFormat('it-IT', { dateStyle: 'short', timeStyle: 'short' });
 
 function countWords(text: string): number {
   const trimmed = text.trim();
   return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
+/**
+ * Lettera della scorciatoia: quella stampata sul tasto (e.key), così su AZERTY Alt+W è
+ * davvero il tasto W; per tastiere non latine o tasti morti (Option su macOS) si ricade
+ * sulla posizione fisica (e.code).
+ */
+function shortcutLetter(e: KeyboardEvent): string {
+  if (/^[a-z]$/i.test(e.key)) return e.key.toLowerCase();
+  return /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : '';
+}
+
+/** La nota della scheda attiva, se l'archivio è pronto e c'è una scheda aperta. */
+function activeNote(): Note | undefined {
+  const state = notesState.value;
+  const { active } = tabsState.value;
+  if (state.status !== 'ready' || active === null) return undefined;
+  return state.notes.find((note) => note.id === active);
+}
+
 export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const wasSettingsOpen = useRef(false);
-  const text = useSignal('');
-  // Passati come segnali nel JSX: a ogni tasto si aggiorna solo il nodo di testo, non tutta l'app.
-  const stats = useComputed(
-    () => `${text.value.length} caratteri · ${countWords(text.value)} parole`,
-  );
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
@@ -30,6 +53,34 @@ export function App() {
   useEffect(() => {
     if (wasSettingsOpen.current && !settingsOpen) menuButtonRef.current?.focus();
     wasSettingsOpen.current = settingsOpen;
+  }, [settingsOpen]);
+
+  // Scorciatoie delle schede: solo con le note pronte e nessun pannello modale aperto.
+  useEffect(() => {
+    if (settingsOpen) return undefined;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || notesState.value.status !== 'ready') return;
+      const altOnly = e.altKey && !e.ctrlKey && !e.shiftKey;
+      const letter = shortcutLetter(e);
+      if (altOnly && letter === 'n') {
+        // Tenendo premuto Alt+N la ripetizione del tasto non crea una nota dopo l'altra.
+        if (e.repeat) {
+          e.preventDefault();
+          return;
+        }
+        void createNoteInNewTab();
+      } else if (altOnly && letter === 'w') {
+        closeActiveTab();
+        focusTabs();
+      } else if (e.altKey && e.ctrlKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+        cycleTabKeepingEditorFocus(e.key === 'ArrowRight' ? 1 : -1);
+      } else {
+        return;
+      }
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [settingsOpen]);
 
   return (
@@ -41,30 +92,22 @@ export function App() {
         <p class="notice" role="note">
           <InfoIcon />
           <span>
-            Anteprima di sviluppo: le note si aprono dall'archivio del browser, ma le modifiche non
-            vengono ancora salvate e si perdono quando chiudi o ricarichi la pagina.
+            Anteprima di sviluppo: note nuove e schede aperte restano nell'archivio del browser, ma
+            le modifiche al testo non vengono ancora salvate e si perdono quando chiudi o ricarichi
+            la pagina.
           </span>
         </p>
         <main class="workspace">
-          <Workspace onTextChange={(value) => (text.value = value)} />
+          <Workspace />
         </main>
-        <footer class="status">
-          <span class="unsaved">Modifiche non salvate</span>
-          <span>{stats}</span>
-          <CreatedAt />
-        </footer>
+        <StatusBar />
       </div>
       {settingsOpen && <SettingsDrawer onClose={closeSettings} />}
     </div>
   );
 }
 
-function firstNote(): Note | undefined {
-  const state = notesState.value;
-  return state.status === 'ready' ? state.notes[0] : undefined;
-}
-
-function Workspace({ onTextChange }: { onTextChange: (text: string) => void }) {
+function Workspace() {
   const state = notesState.value;
   if (state.status === 'loading') {
     return <p class="workspace-message">{state.message ?? 'Apertura delle note…'}</p>;
@@ -77,8 +120,9 @@ function Workspace({ onTextChange }: { onTextChange: (text: string) => void }) {
       </div>
     );
   }
-  const note = state.notes[0];
   const unreadable = state.unreadable.length;
+  const error = actionError.value;
+  const note = activeNote();
   return (
     <>
       {unreadable > 0 && (
@@ -88,19 +132,92 @@ function Workspace({ onTextChange }: { onTextChange: (text: string) => void }) {
             : `${unreadable} note non si possono leggere: sono state lasciate intatte nell’archivio.`}
         </p>
       )}
-      {note && (
-        <Editor
-          key={note.id}
-          initialText={note.text}
-          label="Testo della nota"
-          onChange={onTextChange}
-        />
+      {error && (
+        <p class="workspace-warning" role="alert">
+          {error}
+        </p>
       )}
+      <TabBar notes={state.notes} />
+      {note ? <NotePanel key={note.id} note={note} /> : <NoOpenNotes notes={state.notes} />}
     </>
   );
 }
 
-function CreatedAt() {
-  const note = firstNote();
-  return note ? <span>Creata il {DATE_FORMAT.format(note.createdAt)}</span> : null;
+function NotePanel({ note }: { note: Note }) {
+  // La richiesta di focus vale solo per l'editor che si monta adesso, poi si consuma.
+  const request = editorFocusRequest.peek();
+  const focus = request?.id === note.id ? request : undefined;
+  useEffect(() => {
+    if (editorFocusRequest.peek()?.id === note.id) editorFocusRequest.value = null;
+  }, [note.id]);
+
+  return (
+    <div
+      class="note-panel"
+      role="tabpanel"
+      id={NOTE_PANEL_ID}
+      aria-labelledby={tabElementId(note.id)}
+    >
+      <Editor
+        initialText={note.text}
+        label="Testo della nota"
+        autoFocus={focus !== undefined}
+        initialSelection={focus?.selection}
+        onChange={(text) => updateNoteText(note.id, text)}
+      />
+    </div>
+  );
+}
+
+/** Nessuna scheda aperta: le note restano nell'archivio e da qui si riaprono. */
+function NoOpenNotes({ notes }: { notes: readonly Note[] }) {
+  return (
+    <section class="empty" aria-labelledby="empty-title">
+      <h2 id="empty-title">Nessuna nota aperta</h2>
+      <p>Chiudere una scheda non elimina la nota: puoi riaprirla da qui o crearne una nuova.</p>
+      <button type="button" class="primary" onClick={() => void createNoteInNewTab()}>
+        Nuova nota
+      </button>
+      {notes.length > 0 && (
+        <ul class="reopen" aria-label="Note nell'archivio">
+          {notes.map((note) => (
+            <li key={note.id}>
+              <button
+                type="button"
+                title={noteTooltip(note)}
+                onClick={() => {
+                  openTab(note.id);
+                  focusTabs();
+                }}
+              >
+                <span class="reopen-title">{noteTitle(note.text)}</span>
+                <span class="reopen-date">Creata il {formatDateTime(note.createdAt)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function StatusBar() {
+  // Passati come segnali nel JSX: la barra di stato non si ridisegna a ogni tasto, solo il testo.
+  const stats = useComputed(() => {
+    const note = activeNote();
+    return note ? `${note.text.length} caratteri · ${countWords(note.text)} parole` : '';
+  });
+  // Cambia solo aprendo o chiudendo l'ultima scheda, non a ogni tasto.
+  const hasNote = useComputed(() => activeNote() !== undefined);
+  const created = useComputed(() => {
+    const note = activeNote();
+    return note ? `Creata il ${formatDateTime(note.createdAt)}` : '';
+  });
+  return (
+    <footer class="status">
+      {hasNote.value && <span class="unsaved">Modifiche non salvate</span>}
+      <span>{stats}</span>
+      <span>{created}</span>
+    </footer>
+  );
 }
