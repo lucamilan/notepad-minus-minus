@@ -79,3 +79,81 @@ export function EyeIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
+    </Icon>
+  );
+}
+
+export function SidebarIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M6 3v10" />
+    </Icon>
+  );
+}
+
+export function ListIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 3.5h10M3 8h10M3 12.5h10" />
+    </Icon>
+  );
+}
+
+export function ClockIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="8" cy="8" r="5.8" />
+      <path d="M8 5v3l2 1.5" />
+    </Icon>
+  );
+}
+
+export function TaskIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2.5" y="2.5" width="11" height="11" rx="2" />
+      <path d="M5.5 8.2l1.8 1.8 3.3-3.6" />
+    </Icon>
+  );
+}
+
+export function PinIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 2.5h4l-.5 4 2.5 2.5H4l2.5-2.5z" />
+      <path d="M8 9v4.5" />
+    </Icon>
+  );
+}
+
+export function TagOffIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 2.5h5.5l5.5 5.5-5.5 5.5-5.5-5.5z" />
+      <circle cx="5.5" cy="5.5" r=".8" fill="currentColor" />
+    </Icon>
+  );
+}
+
+export function BookmarkIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 2.5h8v11l-4-3-4 3z" />
+    </Icon>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 9h6.6l.7-9" />
+    </Icon>
+  );
+}

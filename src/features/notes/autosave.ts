@@ -23,9 +23,17 @@ export const saveStatus = signal<SaveStatus>({ state: 'saved', at: null });
 const pending = new Map<string, Note>();
 /** Note la cui creazione è stata annullata: non vanno mai scritte (né lasciate) nell'archivio. */
 const discarded = new Set<string>();
+/** Id delle note nel salvataggio in corso. */
+const writing = new Set<string>();
 let timer: ReturnType<typeof setTimeout> | undefined;
 let running: Promise<void> | null = null;
 let lastSavedAt: number | null = null;
+let savedListener: ((notes: readonly Note[]) => void) | undefined;
+
+/** Chi vuole sapere quali note sono appena finite nell'archivio (avviso tra schede). */
+export function setSavedListener(listener: ((notes: readonly Note[]) => void) | undefined): void {
+  savedListener = listener;
+}
 
 /** Aggiorna il testo della nota in memoria e ne programma il salvataggio. */
 export function editNote(id: string, text: string): void {
@@ -54,6 +62,27 @@ export function discardPendingSave(id: string): void {
   }
 }
 
+/** La nota ha modifiche in coda o in scrittura? */
+export function isPendingSave(id: string): boolean {
+  return pending.has(id) || writing.has(id);
+}
+
+/** Scarta le modifiche in coda di una nota (si è scelto di tenere la versione dell'archivio). */
+export function dropPendingSave(id: string): void {
+  pending.delete(id);
+  if (pending.size === 0 && running === null && saveStatus.value.state === 'pending') {
+    clearTimeout(timer);
+    timer = undefined;
+    saveStatus.value = { state: 'saved', at: lastSavedAt };
+  }
+}
+
+/** Annulla un discardPendingSave (eliminazione fallita): la nota torna a salvarsi. */
+export function restorePendingSave(note: Note): void {
+  discarded.delete(note.id);
+  scheduleSave(note);
+}
+
 export function hasUnsavedChanges(): boolean {
   return pending.size > 0 || running !== null;
 }
@@ -70,11 +99,13 @@ export async function flushSaves(): Promise<void> {
   pending.clear();
   if (batch.length === 0) return;
   saveStatus.value = { state: 'saving' };
+  for (const note of batch) writing.add(note.id);
   running = write(batch);
   try {
     await running;
   } finally {
     running = null;
+    writing.clear();
   }
 }
 
@@ -86,6 +117,7 @@ async function write(batch: Note[]): Promise<void> {
     // ricompare al prossimo avvio dopo che l'utente ha letto "la nota non è stata creata".
     for (const note of batch) if (discarded.has(note.id)) await repo.delete(note.id);
     lastSavedAt = Date.now();
+    savedListener?.(batch.filter((note) => !discarded.has(note.id)));
     saveStatus.value =
       pending.size > 0 ? { state: 'pending' } : { state: 'saved', at: lastSavedAt };
   } catch (error) {
@@ -151,6 +183,7 @@ export function resetAutosaveForTests(): void {
   timer = undefined;
   pending.clear();
   discarded.clear();
+  writing.clear();
   running = null;
   lastSavedAt = null;
   saveStatus.value = { state: 'saved', at: null };

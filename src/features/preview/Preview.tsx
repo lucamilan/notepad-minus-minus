@@ -10,6 +10,8 @@ interface PreviewProps {
   text: string;
   /** Doppio clic (o Invio) per scrivere: `line` è la riga del sorgente del blocco toccato. */
   onRequestEdit: (line: number | null) => void;
+  /** Clic su un tag (#cliente/acme) nell'anteprima. */
+  onTagClick?: ((tag: string) => void) | undefined;
   /** Prende il focus quando cambia (per esempio passando alla sola anteprima). */
   focusToken?: number | undefined;
 }
@@ -22,7 +24,7 @@ function sourceLine(target: EventTarget | null): number | null {
   return block && Number.isInteger(line) ? line : null;
 }
 
-export function Preview({ text, onRequestEdit, focusToken }: PreviewProps) {
+export function Preview({ text, onRequestEdit, onTagClick, focusToken }: PreviewProps) {
   const ref = useRef<HTMLElement>(null);
   const lastRender = useRef<number | null>(null);
 
@@ -58,6 +60,11 @@ export function Preview({ text, onRequestEdit, focusToken }: PreviewProps) {
       aria-label="Anteprima della nota"
       title="Doppio clic o Invio per scrivere"
       aria-keyshortcuts="Enter"
+      onClick={(e) => {
+        const tag = e.target instanceof Element ? e.target.closest('.tag[data-tag]') : null;
+        const name = tag?.getAttribute('data-tag');
+        if (name && onTagClick) onTagClick(name);
+      }}
       onDblClick={(e) => {
         // Il doppio clic seleziona una parola: non serve, si torna al testo.
         window.getSelection()?.removeAllRanges();

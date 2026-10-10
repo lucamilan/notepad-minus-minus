@@ -29,4 +29,34 @@ export const editorTheme = EditorView.theme({
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground':
     { backgroundColor: 'var(--selection)' },
+  // Suggerimenti dei tag (@codemirror/autocomplete).
+  '.cm-tooltip': {
+    backgroundColor: 'var(--paper)',
+    color: 'var(--ink)',
+    border: '1px solid var(--line)',
+    borderRadius: '9px',
+    boxShadow: 'var(--shadow)',
+    overflow: 'hidden',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+    fontFamily: 'var(--f-body)',
+    fontSize: '0.85rem',
+    padding: '4px',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+    padding: '4px 8px',
+    borderRadius: '6px',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: 'var(--accent-soft)',
+    color: 'var(--ink)',
+  },
+  '.cm-completionLabel::before': { content: '"#"', color: 'var(--muted)' },
+  '.cm-completionDetail': {
+    marginLeft: '12px',
+    fontStyle: 'normal',
+    fontFamily: 'var(--f-mono)',
+    fontSize: '0.72rem',
+    color: 'var(--muted)',
+  },
 });

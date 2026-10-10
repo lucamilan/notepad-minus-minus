@@ -1,7 +1,11 @@
 import type { RefObject } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { COLLECTION_ID } from '../features/collection/Collection';
+import { sidebarVisible, toggleSidebar } from '../features/collection/state';
+import { notesState } from '../features/notes/store';
 import { ViewModeSwitch } from '../features/preview/ViewModeSwitch';
-import { DeviceIcon, MoreIcon } from './icons';
+import { openSearch } from '../features/search/state';
+import { DeviceIcon, MoreIcon, SearchIcon, SidebarIcon } from './icons';
 
 interface AppBarProps {
   menuButtonRef: RefObject<HTMLButtonElement>;
@@ -14,6 +18,7 @@ const MENU_ID = 'app-menu';
 // frecce/Home/End per muoversi, Escape chiude e riporta il focus al pulsante.
 export function AppBar({ menuButtonRef, onOpenSettings }: AppBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const ready = notesState.value.status === 'ready';
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -66,15 +71,41 @@ export function AppBar({ menuButtonRef, onOpenSettings }: AppBarProps) {
 
   return (
     <header class="bar">
+      {ready && (
+        <button
+          type="button"
+          class="icon-button plain"
+          aria-label="Raccolta"
+          aria-expanded={sidebarVisible()}
+          aria-controls={COLLECTION_ID}
+          aria-keyshortcuts="Control+Backslash"
+          title="Mostra o nascondi la raccolta (Ctrl+)"
+          onClick={toggleSidebar}
+        >
+          <SidebarIcon />
+        </button>
+      )}
       <span class="logo">
         <span class="logo-mark" aria-hidden="true" />
-        Notepad−−
+        <span class="logo-text">Notepad−−</span>
       </span>
       <span class="badge" title="Le note restano in questo browser e non vengono inviate in rete">
         <DeviceIcon />
         <span>Solo su questo dispositivo</span>
       </span>
       <span class="spacer" />
+      {ready && (
+        <button
+          type="button"
+          class="icon-button"
+          aria-keyshortcuts="Control+K"
+          title="Cerca in tutte le note (Ctrl+K)"
+          onClick={() => openSearch()}
+        >
+          <SearchIcon />
+          <span class="bar-label">Cerca</span>
+        </button>
+      )}
       <ViewModeSwitch />
       <div
         class="menu-wrap"
