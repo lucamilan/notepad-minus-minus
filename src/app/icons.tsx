@@ -166,3 +166,23 @@ export function LockIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function CopyIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+      <path d="M10.5 5.5V3.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" />
+    </Icon>
+  );
+}
+
+/** Più schede impilate con una ×: "chiudi tutte". */
+export function CloseAllIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 2.5h8a1 1 0 0 1 1 1v8" />
+      <rect x="2.5" y="4.5" width="9" height="9" rx="1.5" />
+      <path d="M5.5 7.5l3 3M8.5 7.5l-3 3" />
+    </Icon>
+  );
+}

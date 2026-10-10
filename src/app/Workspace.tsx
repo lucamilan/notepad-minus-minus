@@ -1,4 +1,4 @@
-import { batch, signal, useComputed } from '@preact/signals';
+import { batch, useComputed } from '@preact/signals';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { applyFilter } from '../features/collection/actions';
 import { Collection } from '../features/collection/Collection';
@@ -28,6 +28,7 @@ import { SettingsDrawer } from '../features/settings/SettingsDrawer';
 import {
   actionError,
   closeActiveTab,
+  closeAllTabs,
   createNoteInNewTab,
   cycleTabKeepingEditorFocus,
   isRepeatedClick,
@@ -38,10 +39,11 @@ import {
 import { NOTE_PANEL_ID, noteTooltip, TabBar, tabElementId } from '../features/tabs/TabBar';
 import { tabsState } from '../features/tabs/tabs';
 import { TransferDialog, type TransferKind } from '../features/transfer/TransferDialog';
+import { announcement, announce } from '../lib/announce';
 import { deepActiveElement, focusAfterModal } from '../lib/focus';
 import { formatDateTime, formatTime } from '../lib/format';
 import { AppBar } from './AppBar';
-import { InfoIcon } from './icons';
+import { InfoIcon, SearchIcon } from './icons';
 
 function countWords(text: string): number {
   const trimmed = text.trim();
@@ -56,15 +58,6 @@ function countWords(text: string): number {
 function shortcutLetter(e: KeyboardEvent): string {
   if (/^[a-z]$/i.test(e.key)) return e.key.toLowerCase();
   return /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : '';
-}
-
-/** Messaggio per i lettori di schermo dopo Ctrl+S (lo stato normale non viene annunciato). */
-const announcement = signal('');
-
-/** Svuota e poi riscrive: due Ctrl+S nello stesso minuto vengono annunciati entrambi. */
-function announce(message: string): void {
-  announcement.value = '';
-  setTimeout(() => (announcement.value = message), 100);
 }
 
 function saveStatusText(status: SaveStatus): string {
@@ -207,6 +200,10 @@ export function Workspace() {
         void createNoteInNewTab();
       } else if (altOnly && letter === 'w') {
         closeActiveTab();
+        focusTabs();
+      } else if (e.altKey && e.shiftKey && !e.ctrlKey && letter === 'w') {
+        // Alt+Shift+W: chiude tutte le schede. Nessuna conferma: le note restano nell'archivio.
+        closeAllTabs();
         focusTabs();
       } else if (e.altKey && e.ctrlKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
         cycleTabKeepingEditorFocus(e.key === 'ArrowRight' ? 1 : -1);
@@ -438,25 +435,43 @@ function NotePanel({ note }: { note: Note }) {
   );
 }
 
+/** Note riaperte dalla pagina "Nessuna nota aperta": le più recenti. */
+const REOPEN_MAX = 50;
+
 /** Nessuna scheda aperta: le note restano nell'archivio e da qui si riaprono. */
 function NoOpenNotes({ notes }: { notes: readonly Note[] }) {
+  // Con migliaia di note la pagina resterebbe lenta: solo le più recenti, il resto con Cerca.
+  const recent = sortNotes(notes).slice(0, REOPEN_MAX);
+  const hidden = notes.length - recent.length;
   return (
     <section class="empty" aria-labelledby="empty-title">
       <h2 id="empty-title">Nessuna nota aperta</h2>
       <p>Chiudere una scheda non elimina la nota: puoi riaprirla da qui o crearne una nuova.</p>
-      <button
-        type="button"
-        class="primary"
-        onClick={(e) => {
-          if (!isRepeatedClick(e)) void createNoteInNewTab();
-        }}
-      >
-        Nuova nota
-      </button>
+      <div class="empty-actions">
+        <button
+          type="button"
+          class="primary"
+          aria-keyshortcuts="Alt+N"
+          onClick={(e) => {
+            if (!isRepeatedClick(e)) void createNoteInNewTab();
+          }}
+        >
+          Nuova nota
+        </button>
+        <button
+          type="button"
+          class="small-button"
+          aria-keyshortcuts="Control+K"
+          onClick={() => openSearch()}
+        >
+          <SearchIcon />
+          <span>Cerca nelle note (Ctrl+K)</span>
+        </button>
+      </div>
       {notes.length > 0 && (
         <ul class="reopen" aria-label="Note nell'archivio">
           {/* Ordinate qui, non a ogni tasto: modifiedAt cambia mentre si scrive. */}
-          {sortNotes(notes).map((note) => (
+          {recent.map((note) => (
             <li key={note.id}>
               <button
                 type="button"
@@ -472,6 +487,11 @@ function NoOpenNotes({ notes }: { notes: readonly Note[] }) {
             </li>
           ))}
         </ul>
+      )}
+      {hidden > 0 && (
+        <p class="reopen-more">
+          {hidden === 1 ? 'e un’altra' : `e altre ${hidden}`}: usa Cerca nelle note
+        </p>
       )}
     </section>
   );

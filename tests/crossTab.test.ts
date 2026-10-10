@@ -19,7 +19,7 @@ import { openNotepadDb } from '../src/features/notes/database';
 import { createNote, type Note } from '../src/features/notes/note';
 import { createNoteRepository, type NoteRepository } from '../src/features/notes/repository';
 import { initNotes, notesState, resetNotesStoreForTests } from '../src/features/notes/store';
-import { openTab } from '../src/features/tabs/actions';
+import { createNoteInNewTab, duplicateNote, openTab } from '../src/features/tabs/actions';
 import { tabsState } from '../src/features/tabs/tabs';
 
 const CHANNEL = 'notepad-minus-minus';
@@ -72,6 +72,22 @@ describe('avviso tra schede', () => {
     await flushSaves();
     await vi.waitFor(() => expect(received).toHaveLength(1));
     expect(Object.keys(received[0] as object).sort()).toEqual(['id', 'modifiedAt']);
+  });
+
+  it('una nota creata o duplicata qui si annuncia con solo id e data', async () => {
+    await duplicateNote(active.id, 7000);
+    const copy = tabsState.value.active;
+    await vi.waitFor(() => expect(received).toEqual([{ id: copy, modifiedAt: 7000 }]));
+    await createNoteInNewTab(8000);
+    const created = tabsState.value.active;
+    await vi.waitFor(() => expect(received).toContainEqual({ id: created, modifiedAt: 8000 }));
+  });
+
+  it('una nota nuova creata in un’altra scheda arriva anche qui, senza aprirsi', async () => {
+    const fresh = createNote('# Nuova altrove', 6000);
+    await writeElsewhere(fresh);
+    await vi.waitFor(() => expect(inMemory(fresh.id)?.text).toBe('# Nuova altrove'));
+    expect(tabsState.value.open).not.toContain(fresh.id);
   });
 
   it('una nota non aperta qui si rilegge in silenzio', async () => {

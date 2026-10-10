@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openUnlocked, reloadUnlocked, waitForPendingSaves } from './support';
+import { openUnlocked, reloadUnlocked, unlockVault, waitForPendingSaves } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
@@ -245,4 +245,51 @@ test('su schermi stretti la raccolta è un pannello: prende il focus e lo restit
   await collection(page).locator('.note-item').first().click();
   await expect(collection(page)).toHaveCount(0);
   await expect(editor(page)).toBeFocused();
+});
+
+test('Duplica apre una copia identica e indipendente, che resta dopo il blocco', async ({
+  page,
+}) => {
+  await seed(page);
+  await page.getByRole('tab', { name: 'Preventivo Acme' }).click();
+  await expect(editor(page)).toContainText('Analisi 4 giorni');
+  // Modifica non ancora salvata: la copia la comprende.
+  await editor(page).click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.insertText('\nSconto 10%');
+
+  const duplicate = page.getByRole('button', { name: 'Duplica' });
+  await expect(duplicate).toHaveAttribute('title', 'Crea una copia di questa nota');
+  await duplicate.click();
+  await expect(page.getByRole('tab')).toHaveCount(5);
+  const copyTab = page.getByRole('tab', { selected: true });
+  await expect(copyTab).toHaveText('Preventivo Acme');
+  await expect(page.getByRole('tab').last()).toHaveAttribute('aria-selected', 'true');
+  await expect(editor(page)).toBeFocused();
+  await expect(editor(page)).toHaveText('# Preventivo Acme#cliente/acmeAnalisi 4 giorniSconto 10%');
+  await expect(page.getByRole('button', { name: 'Fissa', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect(page.locator('.sr-only[aria-live="polite"]')).toHaveText('Nota duplicata');
+  await expect(noteItems(page)).toHaveCount(5);
+
+  // Il cursore è all'inizio: si scrive sulla copia, l'originale non cambia.
+  await page.keyboard.insertText('Copia: ');
+  await expect(copyTab).toHaveText('Copia: # Preventivo Acme');
+  const original = page.getByRole('tab', { name: 'Preventivo Acme', exact: true });
+  await expect(original).toHaveCount(1);
+  await original.click();
+  await expect(editor(page)).toContainText('Sconto 10%');
+  await expect(editor(page)).not.toContainText('Copia:');
+
+  await expect(page.locator('.save-state')).toHaveText(/^Salvato alle/);
+  await page.getByRole('button', { name: 'Blocca', exact: true }).click();
+  await unlockVault(page);
+  await expect(page.getByRole('tab')).toHaveCount(5);
+  await expect(page.getByRole('tab', { selected: true })).toHaveText('Preventivo Acme');
+  await expect(editor(page)).toContainText('Sconto 10%');
+  await page.getByRole('tab', { name: 'Copia: # Preventivo Acme' }).click();
+  await expect(editor(page)).toContainText('Sconto 10%');
+  await expect(noteItems(page)).toHaveCount(5);
 });

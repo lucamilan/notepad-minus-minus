@@ -19,7 +19,7 @@ Scrivi in Markdown con anteprima affiancata, organizzi le note con tag nel testo
 
 ## Come si usa
 
-- **Note e schede.** Ogni scheda è una nota aperta; il titolo è la prima riga. Chiudere una scheda non elimina la nota: la riapri dalla raccolta o dalla ricerca. Per eliminarla usa "Elimina…", che chiede conferma.
+- **Note e schede.** Ogni scheda è una nota aperta; il titolo è la prima riga. Chiudere una scheda non elimina la nota: la riapri dalla raccolta o dalla ricerca. "Chiudi tutte le schede" (in fondo alla barra delle schede) le chiude tutte insieme, sempre senza eliminare nulla; restano aperte solo le note cambiate in un’altra scheda del browser, finché non scegli quale versione tenere. "Duplica" crea una copia identica della nota, con le modifiche non ancora salvate, e la apre in una scheda nuova. Per eliminare una nota usa "Elimina…", che chiede conferma.
 - **Salvataggio.** È sempre attivo: le modifiche si salvano dopo mezzo secondo di pausa, quando cambi scheda o chiudi la pagina. Lo stato è nella barra in basso.
 - **Anteprima.** Tre modalità: Modifica, Affiancata, Anteprima. Doppio clic su un punto dell’anteprima per scrivere da quella riga. Le liste di attività (`- [ ] da fare`) diventano caselle.
 - **Tag e raccolta.** Scrivi `#` nel testo e l’editor suggerisce i tag già usati. La raccolta mostra le viste (Tutte, Recenti, Attività aperte, Fissate, Senza tag), i tag per categoria (Clienti, Progetti, Tipi, Altri tag) e le viste che salvi da un filtro. Fissa le note importanti per tenerle in cima.
@@ -31,6 +31,7 @@ Scrivi in Markdown con anteprima affiancata, organizzi le note con tag nel testo
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | <kbd>Alt</kbd>+<kbd>N</kbd>                                                | Nuova nota in una scheda nuova                                            |
 | <kbd>Alt</kbd>+<kbd>W</kbd>                                                | Chiude la scheda (la nota resta nell’archivio)                            |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>                               | Chiude tutte le schede (le note restano nell’archivio)                    |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd>                 | Scheda precedente / successiva                                            |
 | <kbd>←</kbd> <kbd>→</kbd> <kbd>Home</kbd> <kbd>Fine</kbd>, <kbd>Canc</kbd> | Sulle schede: spostarsi, chiudere la scheda                               |
 | <kbd>Ctrl</kbd>+<kbd>E</kbd>                                               | Modifica → Affiancata → Anteprima                                         |

@@ -219,7 +219,7 @@ test('esportazione e importazione si usano solo con la tastiera', async ({ page,
   const downloading = page.waitForEvent('download');
   await page.keyboard.press('Enter');
   const path = await (await downloading).path();
-  const close = page.getByRole('button', { name: 'Chiudi' });
+  const close = page.getByRole('button', { name: 'Chiudi', exact: true });
   await expect(close).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(menu).toBeFocused();
@@ -259,7 +259,7 @@ test('esportazione e importazione si usano solo con la tastiera', async ({ page,
   await expect(other.getByRole('status').filter({ hasText: 'Sostituita' })).toHaveText(
     'Sostituita: 1 nota. 1 nota eliminata.',
   );
-  await expect(other.getByRole('button', { name: 'Chiudi' })).toBeFocused();
+  await expect(other.getByRole('button', { name: 'Chiudi', exact: true })).toBeFocused();
   await other.keyboard.press('Enter');
   await expect(otherMenu).toBeFocused();
   await expect(editor(other)).toContainText('Nota di esempio');

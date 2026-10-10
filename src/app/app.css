@@ -368,6 +368,31 @@ button {
   border-color: var(--accent);
 }
 
+/* Tra "+ Nuova nota" e "Chiudi tutte le schede": almeno 24px, così un clic sbagliato non
+   chiude tutto; si allarga e porta il pulsante in fondo a destra. */
+.tabs-spacer {
+  flex: 1 0 24px;
+  min-width: 24px;
+}
+
+.tab-close-all {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 6px;
+  padding: 4px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tab-close-all:hover {
+  color: var(--ink);
+  border-color: var(--line);
+}
+
 .note-panel {
   flex: 1;
   min-height: 0;
@@ -586,6 +611,14 @@ button {
   max-width: 44ch;
 }
 
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 12px;
+}
+
 .primary {
   background: var(--accent);
   color: var(--on-accent);
@@ -624,6 +657,10 @@ button {
 
 .reopen button:hover {
   border-color: var(--accent);
+}
+
+.reopen-more {
+  font-size: 0.85rem;
 }
 
 .reopen-title {

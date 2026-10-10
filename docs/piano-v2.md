@@ -62,6 +62,11 @@ Tutte le fasi F0–F9 sono completate: la v2 è la versione pubblicata (2.0.0).
 | F8   | Fatta: esportazione e importazione del file `.notepad` cifrato    |
 | F9   | Fatta: PWA offline, e2e completi, collaudo finale, documentazione |
 
+Dopo F9:
+
+- **Chiudi tutte le schede**: pulsante in fondo alla barra delle schede (fuori dal `tablist`) e <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>; chiude le schede con un solo salvataggio di `meta`, senza eliminare note né scartare modifiche in coda e senza conferma; restano aperte le note con l'avviso "cambiata in un'altra scheda", che aspettano la scelta della versione. La pagina "Nessuna nota aperta" ha anche "Cerca nelle note (Ctrl+K)" ed elenca solo le 50 note più recenti.
+- **Duplica**: pulsante nella barra della nota tra "Fissa" ed "Elimina…"; copia identica del testo in memoria (modifiche non salvate comprese), id e date nuovi, non fissata, aperta in una scheda nuova col cursore all'inizio, annunciata con "Nota duplicata". Stesso percorso di Alt+N (`openNewNote`: annullamento se il salvataggio fallisce, epoca del blocco); dopo il salvataggio le altre schede del browser ricevono `{ id, modifiedAt }` e caricano la nota nuova, anche quella creata con Alt+N. Nessuna scorciatoia (Alt+D è la barra degli indirizzi).
+
 Limiti noti e accettati:
 
 - **Origine condivisa**: ogni pagina sotto `lucamilan.github.io` ha la stessa origine dell'app e può leggere o alterare l'archivio cifrato e, a note sbloccate, agire nella pagina. La cifratura protegge la riservatezza a riposo, non l'integrità né una sessione sbloccata. Si risolve solo con un dominio dedicato.
