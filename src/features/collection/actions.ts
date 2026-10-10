@@ -1,19 +1,24 @@
 import { batch } from '@preact/signals';
 import { discardPendingSave, restorePendingSave, scheduleSave } from '../notes/autosave';
-import { announceDeleted } from '../notes/crossTab';
+import { announceDeleted, announceSavedViewsChanged } from '../notes/crossTab';
 import { getRepository, notesState, removeNote, updateNote } from '../notes/store';
 import { actionError, closeTab, editorFocusRequest, openTab } from '../tabs/actions';
 import { collectionFilter, isNarrowScreen, savedViews, sidebarOverlayOpen } from './state';
 import {
+  parseSavedViews,
+  sameFilter,
   SAVED_VIEW_NAME_MAX,
   SAVED_VIEWS_META_KEY,
   type CollectionFilter,
   type SavedView,
 } from './views';
 
-/** Fissa o sgancia la nota: non cambia la data di modifica, ma si salva come una modifica. */
-export function togglePinned(id: string): void {
-  const updated = updateNote(id, (note) => ({ ...note, pinned: !note.pinned }));
+/**
+ * Fissa o sgancia la nota. Conta come una modifica (data compresa): così le altre schede la
+ * rileggono e non la sganciano più tardi riscrivendo la loro copia.
+ */
+export function togglePinned(id: string, now: number = Date.now()): void {
+  const updated = updateNote(id, (note) => ({ ...note, pinned: !note.pinned, modifiedAt: now }));
   if (updated) scheduleSave(updated);
 }
 
@@ -53,28 +58,35 @@ export function openNoteFromCollection(id: string): void {
   });
 }
 
-function persistSavedViews(views: readonly SavedView[]): void {
-  savedViews.value = views;
+/**
+ * Le viste salvate si rileggono dall'archivio prima di cambiarle: un'altra scheda può averne
+ * aggiunte nel frattempo. Poi le altre schede ricevono solo il segnale di rileggerle.
+ */
+async function updateSavedViews(change: (views: SavedView[]) => SavedView[]): Promise<void> {
   try {
-    getRepository()
-      .putMeta(SAVED_VIEWS_META_KEY, views)
-      .catch((error: unknown) => console.error('Viste non salvate', error));
+    const repo = getRepository();
+    const next = change(parseSavedViews(await repo.getMeta(SAVED_VIEWS_META_KEY)));
+    savedViews.value = next;
+    await repo.putMeta(SAVED_VIEWS_META_KEY, next);
+    announceSavedViewsChanged();
   } catch (error) {
     console.error('Viste non salvate', error);
+    actionError.value = 'Non è stato possibile salvare le viste. Riprova.';
   }
 }
 
-export function saveCurrentView(name: string, filter: CollectionFilter): void {
+export function saveCurrentView(name: string, filter: CollectionFilter): Promise<void> {
   const trimmed = name.trim().slice(0, SAVED_VIEW_NAME_MAX);
-  if (!trimmed) return;
-  persistSavedViews([
-    ...savedViews.value,
-    { name: trimmed, view: filter.view, tags: [...filter.tags] },
-  ]);
+  if (!trimmed) return Promise.resolve();
+  const view: SavedView = { name: trimmed, view: filter.view, tags: [...filter.tags] };
+  return updateSavedViews((views) => [...views, view]);
 }
 
-export function removeSavedView(index: number): void {
-  persistSavedViews(savedViews.value.filter((_, i) => i !== index));
+export function removeSavedView(target: SavedView): Promise<void> {
+  return updateSavedViews((views) => {
+    const index = views.findIndex((v) => v.name === target.name && sameFilter(v, target));
+    return index < 0 ? views : views.filter((_, i) => i !== index);
+  });
 }
 
 export function applyFilter(filter: CollectionFilter): void {

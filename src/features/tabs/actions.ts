@@ -114,6 +114,7 @@ export async function createNoteInNewTab(now: number = Date.now()): Promise<void
     console.error(error);
     if (notesState.value.status !== 'ready') return; // archivio chiuso: c'è già il messaggio
     batch(() => {
+      collectionFilter.value = filter;
       closeTab(note.id);
       removeNote(note.id);
       discardPendingSave(note.id);

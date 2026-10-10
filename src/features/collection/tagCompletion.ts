@@ -55,6 +55,9 @@ export function tagCompletion(getTags: () => ReadonlyMap<string, number>): Exten
     override: [source],
     icons: false,
     activateOnTyping: true,
+    // Invio va a capo finché non si sceglie un suggerimento con le frecce: chi scrive un tag
+    // nuovo (prefisso di uno esistente) non se lo vede sostituire.
+    selectOnOpen: false,
     closeOnBlur: true,
   });
 }

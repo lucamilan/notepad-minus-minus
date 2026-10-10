@@ -8,11 +8,11 @@ import { focusTabs } from '../tabs/actions';
 import { deleteNote, applyFilter, togglePinned } from './actions';
 import { TagChip } from './Collection';
 import { deleteRequest, showSidebar } from './state';
-import { categoryOf, tagsOf } from './tags';
+import { categoryOf, noteInfo } from './tags';
 
 /** Barra sopra il testo: fissa, tag della nota (filtrano la raccolta), data, elimina. */
 export function NoteBar({ note }: { note: Note }) {
-  const tags = tagsOf(note.text);
+  const { tags } = noteInfo(note);
   return (
     <>
       <ElsewhereNotice id={note.id} />
@@ -25,7 +25,7 @@ export function NoteBar({ note }: { note: Note }) {
           onClick={() => togglePinned(note.id)}
         >
           <PinIcon />
-          <span>{note.pinned ? 'Fissata' : 'Fissa'}</span>
+          <span>Fissa</span>
         </button>
         <span class="note-tags">
           {tags.length === 0 ? (
@@ -94,7 +94,16 @@ export function DeleteDialog({ note }: { note: Note }) {
   };
 
   return (
-    <dialog ref={ref} class="confirm" aria-labelledby="delete-title" aria-describedby="delete-text">
+    <dialog
+      ref={ref}
+      onCancel={(e) => {
+        // Durante l'eliminazione Esc non può più annullarla: si aspetta l'esito.
+        if (busy) e.preventDefault();
+      }}
+      class="confirm"
+      aria-labelledby="delete-title"
+      aria-describedby="delete-text"
+    >
       <h2 id="delete-title">Eliminare questa nota?</h2>
       <p id="delete-text">
         "{noteTitle(note.text)}" verrà cancellata da questo browser e non si potrà recuperare. Per

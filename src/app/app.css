@@ -688,6 +688,7 @@ button {
 }
 
 .save-state[data-state='pending'],
+.save-state[data-state='held'],
 .save-state[data-state='error'] {
   color: var(--warn);
 }

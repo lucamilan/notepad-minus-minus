@@ -1,5 +1,5 @@
 import type { Note } from '../notes/note';
-import { openTaskCount, tagLabel, tagsOf } from './tags';
+import { noteInfo, tagLabel } from './tags';
 
 export type ViewId = 'all' | 'recent' | 'open' | 'pinned' | 'untagged';
 
@@ -20,9 +20,9 @@ export const VIEWS: readonly ViewDefinition[] = [
     label: 'Recenti',
     test: (note, now) => now - note.modifiedAt < RECENT_DAYS * DAY_MS,
   },
-  { id: 'open', label: 'Attività aperte', test: (note) => openTaskCount(note.text) > 0 },
+  { id: 'open', label: 'Attività aperte', test: (note) => noteInfo(note).openTasks > 0 },
   { id: 'pinned', label: 'Fissate', test: (note) => note.pinned },
-  { id: 'untagged', label: 'Senza tag', test: (note) => tagsOf(note.text).length === 0 },
+  { id: 'untagged', label: 'Senza tag', test: (note) => noteInfo(note).tags.length === 0 },
 ];
 
 export function viewDefinition(id: ViewId): ViewDefinition {
@@ -43,7 +43,7 @@ export const NO_FILTER: CollectionFilter = { view: 'all', tags: [] };
 
 export function matchesFilter(note: Note, filter: CollectionFilter, now: number): boolean {
   if (!viewDefinition(filter.view).test(note, now)) return false;
-  const tags = tagsOf(note.text);
+  const { tags } = noteInfo(note);
   return filter.tags.every((tag) => tags.includes(tag));
 }
 
@@ -79,6 +79,7 @@ export interface SavedView extends CollectionFilter {
 }
 
 export const SAVED_VIEWS_META_KEY = 'savedViews';
+const VALID_TAG = /^\p{L}[\p{L}\p{N}_-]*(?:\/[\p{L}\p{N}_-]+)?$/u;
 export const SAVED_VIEW_NAME_MAX = 60;
 
 export function parseSavedViews(value: unknown): SavedView[] {
@@ -95,6 +96,9 @@ export function parseSavedViews(value: unknown): SavedView[] {
     ) {
       return [];
     }
-    return [{ name: v['name'].slice(0, SAVED_VIEW_NAME_MAX), view: v['view'], tags }];
+    const name = v['name'].trim().slice(0, SAVED_VIEW_NAME_MAX);
+    if (!name) return [];
+    const valid = [...new Set(tags.map((t) => t.toLowerCase()).filter((t) => VALID_TAG.test(t)))];
+    return [{ name, view: v['view'], tags: valid }];
   });
 }

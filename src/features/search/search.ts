@@ -1,4 +1,4 @@
-import { bodyText, openTaskCount, tagsOf } from '../collection/tags';
+import { bodyText, noteInfo, sliceChars } from '../collection/tags';
 import { RECENT_DAYS } from '../collection/views';
 import { noteTitle, type Note } from '../notes/note';
 
@@ -67,6 +67,28 @@ function tagMatches(tag: string, filter: string): boolean {
   return plain.startsWith(filter) || plain.includes(`/${filter}`);
 }
 
+/** Forme normalizzate di una nota: l'indice della ricerca, solo in memoria e legato alla nota. */
+interface IndexEntry {
+  title: string;
+  tags: string;
+  body: string;
+}
+
+const index = new WeakMap<Note, IndexEntry>();
+
+function indexEntry(note: Note): IndexEntry {
+  let entry = index.get(note);
+  if (!entry) {
+    entry = {
+      title: normalize(noteTitle(note.text)),
+      tags: normalize(noteInfo(note).tags.join(' ')),
+      body: normalize(note.text),
+    };
+    index.set(note, entry);
+  }
+  return entry;
+}
+
 export interface SearchResult {
   note: Note;
   score: number;
@@ -80,15 +102,13 @@ export function searchNotes(
 ): SearchResult[] {
   const results: SearchResult[] = [];
   for (const note of notes) {
-    const tags = tagsOf(note.text);
+    const { tags, openTasks } = noteInfo(note);
     if (!query.tags.every((filter) => tags.some((tag) => tagMatches(tag, filter)))) continue;
-    if (query.status.includes('aperte') && openTaskCount(note.text) === 0) continue;
+    if (query.status.includes('aperte') && openTasks === 0) continue;
     if (query.status.includes('fissate') && !note.pinned) continue;
     if (query.status.includes('recenti') && now - note.modifiedAt >= RECENT_DAYS * DAY_MS) continue;
 
-    const title = normalize(noteTitle(note.text));
-    const tagText = normalize(tags.join(' '));
-    const body = normalize(note.text);
+    const { title, tags: tagText, body } = indexEntry(note);
     let score = 0;
     let matched = true;
     for (const term of query.terms) {
@@ -153,9 +173,9 @@ export function snippet(text: string, terms: readonly string[]): Segment[] {
     const at = term ? plain.indexOf(term) : -1;
     if (at >= 0 && (best < 0 || at < best)) best = at;
   }
-  if (best < 0) return highlight(body.slice(0, SNIPPET_LENGTH), []);
+  if (best < 0) return highlight(sliceChars(body, 0, SNIPPET_LENGTH), []);
   const start = Math.max(0, (map[best] ?? 0) - SNIPPET_LEAD);
-  const piece = body.slice(start, start + SNIPPET_LENGTH);
+  const piece = sliceChars(body, start, start + SNIPPET_LENGTH);
   const segments = highlight(piece, terms);
   return start > 0 ? [{ text: '…', mark: false }, ...segments] : segments;
 }

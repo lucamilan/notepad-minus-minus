@@ -74,12 +74,12 @@ export function AppBar({ menuButtonRef, onOpenSettings }: AppBarProps) {
       {ready && (
         <button
           type="button"
-          class="icon-button plain"
+          class="icon-button plain sidebar-toggle"
           aria-label="Raccolta"
           aria-expanded={sidebarVisible()}
-          aria-controls={COLLECTION_ID}
-          aria-keyshortcuts="Control+Backslash"
-          title="Mostra o nascondi la raccolta (Ctrl+)"
+          aria-controls={sidebarVisible() ? COLLECTION_ID : undefined}
+          aria-keyshortcuts="Control+\"
+          title="Mostra o nascondi la raccolta (Ctrl+\)"
           onClick={toggleSidebar}
         >
           <SidebarIcon />

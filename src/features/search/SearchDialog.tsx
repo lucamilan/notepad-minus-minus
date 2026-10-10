@@ -4,13 +4,15 @@ import { deepActiveElement, focusAfterModal } from '../../lib/focus';
 import { formatRelative } from '../../lib/format';
 import { openNoteFromCollection } from '../collection/actions';
 import { TagChip } from '../collection/Collection';
-import { tagsOf } from '../collection/tags';
+import { noteInfo } from '../collection/tags';
 import { noteTitle, type Note } from '../notes/note';
 import { highlight, isEmptyQuery, parseQuery, searchNotes, snippet, type Segment } from './search';
 import { closeSearch } from './state';
 
 const LISTBOX_ID = 'search-results';
 const RECENT_LIMIT = 6;
+/** Righe mostrate al massimo: oltre conviene affinare la ricerca. */
+const SHOWN_LIMIT = 50;
 const FILTER_HINTS = ['#cliente/', '#progetto/', '#tipo/', 'is:aperte', 'is:fissate', 'is:recenti'];
 
 function optionId(index: number): string {
@@ -47,13 +49,14 @@ export function SearchDialog({
 
   const parsed = useMemo(() => parseQuery(query), [query]);
   const filtered = !isEmptyQuery(parsed);
-  const results = useMemo(
+  const found = useMemo(
     () =>
       filtered
         ? searchNotes(notes, parsed).map((r) => r.note)
         : [...notes].sort((a, b) => b.modifiedAt - a.modifiedAt).slice(0, RECENT_LIMIT),
     [notes, parsed, filtered],
   );
+  const results = found.length > SHOWN_LIMIT ? found.slice(0, SHOWN_LIMIT) : found;
   const current = Math.min(selected, Math.max(0, results.length - 1));
 
   // Prima del disegno: chi preme Ctrl+K e scrive subito non perde i primi caratteri.
@@ -83,6 +86,12 @@ export function SearchDialog({
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
+    if (e.isComposing) return;
+    // Ctrl+K a ricerca aperta non deve finire al browser (barra di ricerca).
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'ArrowDown') setSelected(Math.min(current + 1, results.length - 1));
     else if (e.key === 'ArrowUp') setSelected(Math.max(current - 1, 0));
     else if (e.key === 'Home' && e.ctrlKey) setSelected(0);
@@ -100,9 +109,12 @@ export function SearchDialog({
   };
 
   const count = results.length;
-  const heading = filtered
-    ? `${count} ${count === 1 ? 'risultato' : 'risultati'}`
-    : 'Modificate di recente';
+  const total = found.length;
+  const heading = !filtered
+    ? 'Modificate di recente'
+    : total > count
+      ? `${total} risultati, mostrati i primi ${count}`
+      : `${total} ${total === 1 ? 'risultato' : 'risultati'}`;
 
   return (
     <dialog
@@ -170,7 +182,9 @@ export function SearchDialog({
                 onClick={() => pick(note)}
               >
                 <span class="search-option-title">
-                  {note.pinned && <PinIcon class="pin" />}
+                  {note.pinned && (
+                    <PinIcon class="pin" role="img" aria-hidden="false" aria-label="Fissata" />
+                  )}
                   <span>
                     <Highlighted segments={highlight(noteTitle(note.text), parsed.terms)} />
                   </span>
@@ -179,9 +193,9 @@ export function SearchDialog({
                 <span class="search-option-snippet">
                   <Highlighted segments={snippet(note.text, parsed.terms)} />
                 </span>
-                {tagsOf(note.text).length > 0 && (
+                {noteInfo(note).tags.length > 0 && (
                   <span class="search-option-tags">
-                    {tagsOf(note.text).map((tag) => (
+                    {noteInfo(note).tags.map((tag) => (
                       <TagChip key={tag} tag={tag} />
                     ))}
                   </span>

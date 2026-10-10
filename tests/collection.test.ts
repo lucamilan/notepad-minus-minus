@@ -3,6 +3,7 @@ import {
   bodyText,
   categoryOf,
   openTaskCount,
+  sliceChars,
   tagCounts,
   tagLabel,
   tagsOf,
@@ -165,5 +166,27 @@ describe('ricerca', () => {
     const segments = snippet(long.text, ['trovata']);
     expect(segments[0]).toEqual({ text: '…', mark: false });
     expect(segments.some((s) => s.mark && s.text === 'trovata')).toBe(true);
+  });
+});
+
+describe('casi limite', () => {
+  it('codice con più apici e recinti chiusi solo da righe di soli segni', () => {
+    expect(tagsOf('``a`b`` #fuori')).toEqual(['fuori']);
+    expect(tagsOf('```js\n#dentro\n```js\n#ancora-dentro\n```\n#fuori')).toEqual(['fuori']);
+    expect(tagsOf('~~~\n#dentro\n```\n#ancora\n~~~\n#fuori')).toEqual(['fuori']);
+  });
+
+  it('i frammenti non spezzano le emoji', () => {
+    expect(sliceChars('ab😀cd', 0, 3)).toBe('ab');
+    expect(sliceChars('ab😀cd', 3, 6)).toBe('😀cd');
+  });
+
+  it('le viste salvate scartano nomi vuoti e tag non validi o doppi', () => {
+    expect(
+      parseSavedViews([
+        { name: '  ', view: 'all', tags: [] },
+        { name: ' Mia ', view: 'all', tags: ['Cliente/Acme', 'cliente/acme', '<b>', ''] },
+      ]),
+    ).toEqual([{ name: 'Mia', view: 'all', tags: ['cliente/acme'] }]);
   });
 });

@@ -71,6 +71,8 @@ function saveStatusText(status: SaveStatus): string {
       return 'Modifiche non salvate';
     case 'saving':
       return 'Salvataggio…';
+    case 'held':
+      return 'In attesa: scegli quale versione tenere';
     case 'error':
       return status.message;
   }
@@ -120,7 +122,14 @@ export function App() {
   }, []);
 
   // Un dialogo modale aperto (impostazioni, ricerca, eliminazione) rende inerte il resto.
-  const modalOpen = settingsOpen || searchRequest.value !== null || deleteRequest.value !== null;
+  // Conta solo ciò che è davvero sullo schermo: se l'archivio si chiude mentre la ricerca è
+  // aperta, il messaggio d'errore non deve restare inerte.
+  const state = notesState.value;
+  const ready = state.status === 'ready';
+  const deleting = deleteRequest.value;
+  const noteToDelete = ready ? state.notes.find((note) => note.id === deleting) : undefined;
+  const search = ready ? searchRequest.value : null;
+  const modalOpen = settingsOpen || search !== null || noteToDelete !== undefined;
 
   // Scorciatoie delle schede: solo con le note pronte e nessun pannello modale aperto.
   useEffect(() => {
@@ -174,12 +183,6 @@ export function App() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [modalOpen]);
 
-  const state = notesState.value;
-  const deleting = deleteRequest.value;
-  const noteToDelete =
-    state.status === 'ready' ? state.notes.find((note) => note.id === deleting) : undefined;
-  const search = searchRequest.value;
-
   return (
     <div class="app">
       {/* Con un pannello modale aperto il resto è inerte in modo esplicito: showModal() da solo
@@ -200,9 +203,7 @@ export function App() {
       </div>
       <SaveAnnouncer />
       {settingsOpen && <SettingsDrawer onClose={closeSettings} />}
-      {search && state.status === 'ready' && (
-        <SearchDialog notes={state.notes} initialQuery={search.query} />
-      )}
+      {search && ready && <SearchDialog notes={state.notes} initialQuery={search.query} />}
       {noteToDelete && <DeleteDialog note={noteToDelete} />}
     </div>
   );
@@ -229,6 +230,7 @@ function Workspace() {
   const showCollection = sidebarVisible();
   return (
     <div class="workspace-body" data-collection={showCollection ? 'shown' : 'hidden'}>
+      <CollectionFocus shown={showCollection} overlay={overlay} />
       {showCollection && <Collection notes={state.notes} />}
       {showCollection && overlay && (
         <div
@@ -237,7 +239,8 @@ function Workspace() {
           onClick={() => (sidebarOverlayOpen.value = false)}
         />
       )}
-      <div class="workspace-main">
+      {/* Su schermi stretti la raccolta copre le note: sotto, niente Tab né lettore di schermo. */}
+      <div class="workspace-main" inert={showCollection && overlay}>
         {unreadable > 0 && (
           <p class="workspace-warning" role="status">
             {unreadable === 1
@@ -261,6 +264,29 @@ function Workspace() {
       </div>
     </div>
   );
+}
+
+/**
+ * Focus della raccolta: aperta come pannello sopra le note, il focus entra nel pannello;
+ * chiusa (Esc, clic fuori, Ctrl+) con il focus dentro, torna sul pulsante "Raccolta".
+ */
+function CollectionFocus({ shown, overlay }: { shown: boolean; overlay: boolean }) {
+  const wasShown = useRef(shown);
+  useEffect(() => {
+    if (wasShown.current === shown) return;
+    wasShown.current = shown;
+    if (shown && overlay) {
+      document.querySelector<HTMLElement>('.collection .find')?.focus();
+    } else if (!shown) {
+      // Dopo il disegno: se si è aperta una nota dalla raccolta, il focus è già nel suo testo.
+      requestAnimationFrame(() => {
+        if (document.activeElement === document.body || !document.activeElement) {
+          document.querySelector<HTMLElement>('.sidebar-toggle')?.focus();
+        }
+      });
+    }
+  }, [shown, overlay]);
+  return null;
 }
 
 /** Offset del primo carattere della riga `line` (0 = prima riga). */

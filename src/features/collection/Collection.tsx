@@ -1,4 +1,4 @@
-import type { JSX } from 'preact';
+import { Component, type JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   BookmarkIcon,
@@ -17,14 +17,12 @@ import { tabsState } from '../tabs/tabs';
 import { applyFilter, openNoteFromCollection, removeSavedView, saveCurrentView } from './actions';
 import { collectionFilter, savedViews } from './state';
 import {
-  bodyText,
   CATEGORIES,
   categoryOf,
   OTHER_TAGS_LABEL,
-  openTaskCount,
   tagCounts,
   tagLabel,
-  tagsOf,
+  noteInfo,
   type CategoryId,
 } from './tags';
 import {
@@ -60,7 +58,8 @@ export function TagChip({ tag }: { tag: string }) {
 
 /** Raccolta: viste, viste salvate, tag per categoria e l'elenco delle note filtrate. */
 export function Collection({ notes }: { notes: readonly Note[] }) {
-  const now = Date.now();
+  // Al minuto: le date relative ("oggi 15:56") non cambiano a ogni tasto.
+  const now = Math.floor(Date.now() / 60_000) * 60_000;
   return (
     <aside id={COLLECTION_ID} class="collection" aria-label="Raccolta">
       <Navigation notes={notes} now={now} />
@@ -86,8 +85,9 @@ function NavButton({
     <button type="button" class="nav-item" aria-pressed={pressed} onClick={onClick}>
       {icon}
       <span class="nav-label">{label}</span>
-      <span class="nav-count" aria-label={`${count} note`}>
-        {count}
+      <span class="nav-count">
+        <span aria-hidden="true">{count}</span>
+        <span class="sr-only">{count === 1 ? '1 nota' : `${count} note`}</span>
       </span>
     </button>
   );
@@ -148,7 +148,7 @@ function Navigation({ notes, now }: { notes: readonly Note[]; now: number }) {
               class="nav-remove"
               aria-label={`Elimina la vista ${view.name}`}
               title="Elimina la vista (le note restano)"
-              onClick={() => removeSavedView(index)}
+              onClick={() => void removeSavedView(view)}
             >
               ×
             </button>
@@ -263,7 +263,7 @@ function NoteList({ notes, now }: { notes: readonly Note[]; now: number }) {
             class="save-view"
             onSubmit={(e) => {
               e.preventDefault();
-              saveCurrentView(name || suggestViewName(filter), filter);
+              void saveCurrentView(name || suggestViewName(filter), filter);
               setNaming(false);
             }}
           >
@@ -309,34 +309,53 @@ function NoteList({ notes, now }: { notes: readonly Note[]; now: number }) {
   );
 }
 
-function NoteItem({ note, current, now }: { note: Note; current: boolean; now: number }) {
-  const tags = tagsOf(note.text);
-  const tasks = openTaskCount(note.text);
-  const excerpt = bodyText(note.text).slice(0, 90);
-  return (
-    <button
-      type="button"
-      class="note-item"
-      aria-current={current ? 'true' : undefined}
-      onClick={() => openNoteFromCollection(note.id)}
-    >
-      <span class="note-item-title">
-        {note.pinned && <PinIcon class="pin" aria-label="Fissata" aria-hidden="false" role="img" />}
-        <span>{noteTitle(note.text)}</span>
-      </span>
-      {excerpt && <span class="note-item-excerpt">{excerpt}</span>}
-      <span class="note-item-meta">
-        <span class="note-item-date">{formatRelative(note.modifiedAt, now)}</span>
-        {tasks > 0 && (
-          <span class="note-item-tasks">
-            {tasks === 1 ? '1 attività aperta' : `${tasks} attività aperte`}
-          </span>
-        )}
-        {tags.slice(0, 3).map((tag) => (
-          <TagChip key={tag} tag={tag} />
-        ))}
-        {tags.length > 3 && <span>+{tags.length - 3}</span>}
-      </span>
-    </button>
-  );
+interface NoteItemProps {
+  note: Note;
+  current: boolean;
+  now: number;
+}
+
+/**
+ * Una riga dell'elenco. Si ridisegna solo se cambia la sua nota (oggetto nuovo a ogni
+ * modifica), lo stato di nota attiva o il minuto: con migliaia di note un tasto non
+ * ridisegna tutto l'elenco.
+ */
+class NoteItem extends Component<NoteItemProps> {
+  override shouldComponentUpdate(next: NoteItemProps): boolean {
+    const { note, current, now } = this.props;
+    return next.note !== note || next.current !== current || next.now !== now;
+  }
+
+  override render() {
+    const { note, current, now } = this.props;
+    const { tags, openTasks, excerpt } = noteInfo(note);
+    return (
+      <button
+        type="button"
+        class="note-item"
+        aria-current={current ? 'true' : undefined}
+        onClick={() => openNoteFromCollection(note.id)}
+      >
+        <span class="note-item-title">
+          {note.pinned && (
+            <PinIcon class="pin" aria-label="Fissata" aria-hidden="false" role="img" />
+          )}
+          <span>{noteTitle(note.text)}</span>
+        </span>
+        {excerpt && <span class="note-item-excerpt">{excerpt}</span>}
+        <span class="note-item-meta">
+          <span class="note-item-date">{formatRelative(note.modifiedAt, now)}</span>
+          {openTasks > 0 && (
+            <span class="note-item-tasks">
+              {openTasks === 1 ? '1 attività aperta' : `${openTasks} attività aperte`}
+            </span>
+          )}
+          {tags.slice(0, 3).map((tag) => (
+            <TagChip key={tag} tag={tag} />
+          ))}
+          {tags.length > 3 && <span>+{tags.length - 3}</span>}
+        </span>
+      </button>
+    );
+  }
 }

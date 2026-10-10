@@ -85,11 +85,10 @@ test('una nota fissata sta in cima e nella vista Fissate, anche dopo il ricarica
 }) => {
   await seed(page);
   await page.getByRole('tab', { name: 'Kickoff portale' }).click();
-  await page.getByRole('button', { name: 'Fissa', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Fissata', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  const pin = page.getByRole('button', { name: 'Fissa', exact: true });
+  await expect(pin).toHaveAttribute('aria-pressed', 'false');
+  await pin.click();
+  await expect(pin).toHaveAttribute('aria-pressed', 'true');
   await expect(noteItems(page).first()).toContainText('Kickoff portale');
   await page.reload();
   await nav(page)
@@ -161,8 +160,12 @@ test('scrivendo # l’editor suggerisce i tag già usati', async ({ page }) => {
   await page.keyboard.type(' #acm');
   const suggestion = page.locator('.editor-host').getByRole('option', { name: /cliente\/acme/ });
   await expect(suggestion).toBeVisible();
-  // CodeMirror ignora Invio nei primi 75 ms dopo l'apertura dei suggerimenti (interactionDelay).
+  // Invio senza aver scelto va a capo: chi scrive un tag nuovo non se lo vede sostituire.
+  await expect(suggestion).not.toHaveAttribute('aria-selected', 'true');
+  // Con la freccia si sceglie; CodeMirror ignora i tasti nei primi 75 ms (interactionDelay).
   await page.waitForTimeout(150);
+  await page.keyboard.press('ArrowDown');
+  await expect(suggestion).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Enter');
   await expect(editor(page)).toContainText('#cliente/acme ');
 });
@@ -219,4 +222,27 @@ test('una nota nuova creata in un’altra scheda compare nella raccolta', async 
   await expect(noteItems(page).filter({ hasText: 'Dall’altra scheda' })).toHaveCount(1);
   await waitForPendingSaves(other);
   await other.close();
+});
+
+test('su schermi stretti la raccolta è un pannello: prende il focus e lo restituisce', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 900, height: 760 });
+  await openApp(page);
+  await expect(collection(page)).toHaveCount(0);
+  const toggle = page.getByRole('button', { name: 'Raccolta' });
+  await toggle.click();
+  await expect(collection(page)).toBeVisible();
+  await expect(collection(page).getByRole('button', { name: /Cerca nelle note/ })).toBeFocused();
+  // Le note sotto il pannello sono inerti.
+  await expect(page.locator('.workspace-main')).toHaveAttribute('inert', '');
+  await page.keyboard.press('Escape');
+  await expect(collection(page)).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+
+  // Scegliendo una nota il pannello si chiude e si scrive subito.
+  await toggle.click();
+  await collection(page).locator('.note-item').first().click();
+  await expect(collection(page)).toHaveCount(0);
+  await expect(editor(page)).toBeFocused();
 });
