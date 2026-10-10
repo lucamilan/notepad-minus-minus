@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waitForPendingSaves } from './support';
+
+test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
 declare global {
   interface Window {

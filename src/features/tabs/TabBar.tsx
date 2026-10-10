@@ -1,7 +1,14 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { formatDateTime } from '../../lib/format';
 import { noteTitle, tabTitle, type Note } from '../notes/note';
-import { closeTab, createNoteInNewTab, focusTabs, openTab, tabFocusRequest } from './actions';
+import {
+  closeTab,
+  createNoteInNewTab,
+  focusTabs,
+  isRepeatedClick,
+  openTab,
+  tabFocusRequest,
+} from './actions';
 import { tabsState } from './tabs';
 
 export const NOTE_PANEL_ID = 'note-panel';
@@ -122,7 +129,9 @@ export function TabBar({ notes }: { notes: readonly Note[] }) {
         ref={newButtonRef}
         title="Nuova nota (Alt+N)"
         aria-keyshortcuts="Alt+N"
-        onClick={() => void createNoteInNewTab()}
+        onClick={(e) => {
+          if (!isRepeatedClick(e)) void createNoteInNewTab();
+        }}
       >
         + Nuova nota
       </button>

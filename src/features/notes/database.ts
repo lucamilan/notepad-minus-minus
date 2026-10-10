@@ -44,6 +44,11 @@ export const MIGRATIONS: readonly Migration[] = [
 export const DB_VERSION = MIGRATIONS.length;
 
 export interface ConnectionEvents {
+  /**
+   * Un'altra scheda vuole aggiornare lo schema: ultima occasione per scrivere (per esempio
+   * le modifiche in coda) prima che la connessione si chiuda. L'altra scheda aspetta.
+   */
+  beforeClose?: () => Promise<void>;
   /** Un'altra scheda vuole aggiornare lo schema: la connessione è già stata chiusa. */
   onVersionChange?: () => void;
   /** Un'altra scheda con lo schema vecchio impedisce l'aggiornamento di questa. */
@@ -63,10 +68,19 @@ export function openNotepadDb(
       }
     },
     blocked: () => events.onBlocked?.(),
-    // Chiudere subito evita di bloccare la scheda che porta la versione nuova.
+    // Si chiude appena salvato quanto resta in coda, per non bloccare a lungo la scheda che
+    // porta la versione nuova.
     blocking: () => {
-      void connection.then((db) => db.close());
-      events.onVersionChange?.();
+      void connection.then(async (db) => {
+        try {
+          await events.beforeClose?.();
+        } catch (error) {
+          console.error(error);
+        } finally {
+          db.close();
+          events.onVersionChange?.();
+        }
+      });
     },
     terminated: () => events.onTerminated?.(),
   });

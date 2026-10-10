@@ -1,21 +1,23 @@
-import { useComputed } from '@preact/signals';
+import { signal, useComputed } from '@preact/signals';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Editor } from '../features/editor/Editor';
-import { noteTitle, type Note } from '../features/notes/note';
-import { notesState, updateNoteText } from '../features/notes/store';
+import { noteTitle, sortNotes, type Note } from '../features/notes/note';
+import { editNote, flushSaves, saveStatus, type SaveStatus } from '../features/notes/autosave';
+import { notesState } from '../features/notes/store';
 import { SettingsDrawer } from '../features/settings/SettingsDrawer';
 import {
   actionError,
   closeActiveTab,
   createNoteInNewTab,
   cycleTabKeepingEditorFocus,
+  isRepeatedClick,
   editorFocusRequest,
   focusTabs,
   openTab,
 } from '../features/tabs/actions';
 import { NOTE_PANEL_ID, noteTooltip, TabBar, tabElementId } from '../features/tabs/TabBar';
 import { tabsState } from '../features/tabs/tabs';
-import { formatDateTime } from '../lib/format';
+import { formatDateTime, formatTime } from '../lib/format';
 import { AppBar } from './AppBar';
 import { InfoIcon } from './icons';
 
@@ -32,6 +34,28 @@ function countWords(text: string): number {
 function shortcutLetter(e: KeyboardEvent): string {
   if (/^[a-z]$/i.test(e.key)) return e.key.toLowerCase();
   return /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : '';
+}
+
+/** Messaggio per i lettori di schermo dopo Ctrl+S (lo stato normale non viene annunciato). */
+const announcement = signal('');
+
+/** Svuota e poi riscrive: due Ctrl+S nello stesso minuto vengono annunciati entrambi. */
+function announce(message: string): void {
+  announcement.value = '';
+  setTimeout(() => (announcement.value = message), 100);
+}
+
+function saveStatusText(status: SaveStatus): string {
+  switch (status.state) {
+    case 'saved':
+      return status.at === null ? 'Salvato nel browser' : `Salvato alle ${formatTime(status.at)}`;
+    case 'pending':
+      return 'Modifiche non salvate';
+    case 'saving':
+      return 'Salvataggio…';
+    case 'error':
+      return status.message;
+  }
 }
 
 /** La nota della scheda attiva, se l'archivio è pronto e c'è una scheda aperta. */
@@ -54,6 +78,28 @@ export function App() {
     if (wasSettingsOpen.current && !settingsOpen) menuButtonRef.current?.focus();
     wasSettingsOpen.current = settingsOpen;
   }, [settingsOpen]);
+
+  // Ctrl+S sempre, anche con un pannello aperto: altrimenti il browser salverebbe la pagina.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || shortcutLetter(e) !== 's') return;
+      e.preventDefault();
+      if (e.repeat) return;
+      void flushSaves().then(() => {
+        if (notesState.value.status !== 'ready') return;
+        const status = saveStatus.value;
+        // Gli errori li annuncia già il contenitore role="alert": niente doppioni.
+        if (status.state === 'error') return;
+        announce(
+          status.state === 'saved'
+            ? `Tutte le note salvate alle ${formatTime(status.at ?? Date.now())}`
+            : 'Salvataggio in corso',
+        );
+      });
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   // Scorciatoie delle schede: solo con le note pronte e nessun pannello modale aperto.
   useEffect(() => {
@@ -92,9 +138,8 @@ export function App() {
         <p class="notice" role="note">
           <InfoIcon />
           <span>
-            Anteprima di sviluppo: note nuove e schede aperte restano nell'archivio del browser, ma
-            le modifiche al testo non vengono ancora salvate e si perdono quando chiudi o ricarichi
-            la pagina.
+            Anteprima di sviluppo: le note si salvano solo in questo browser, ma non sono ancora
+            cifrate. Non scrivere dati riservati finché non arriva la passphrase.
           </span>
         </p>
         <main class="workspace">
@@ -102,6 +147,7 @@ export function App() {
         </main>
         <StatusBar />
       </div>
+      <SaveAnnouncer />
       {settingsOpen && <SettingsDrawer onClose={closeSettings} />}
     </div>
   );
@@ -163,7 +209,7 @@ function NotePanel({ note }: { note: Note }) {
         label="Testo della nota"
         autoFocus={focus !== undefined}
         initialSelection={focus?.selection}
-        onChange={(text) => updateNoteText(note.id, text)}
+        onChange={(text) => editNote(note.id, text)}
       />
     </div>
   );
@@ -175,12 +221,19 @@ function NoOpenNotes({ notes }: { notes: readonly Note[] }) {
     <section class="empty" aria-labelledby="empty-title">
       <h2 id="empty-title">Nessuna nota aperta</h2>
       <p>Chiudere una scheda non elimina la nota: puoi riaprirla da qui o crearne una nuova.</p>
-      <button type="button" class="primary" onClick={() => void createNoteInNewTab()}>
+      <button
+        type="button"
+        class="primary"
+        onClick={(e) => {
+          if (!isRepeatedClick(e)) void createNoteInNewTab();
+        }}
+      >
         Nuova nota
       </button>
       {notes.length > 0 && (
         <ul class="reopen" aria-label="Note nell'archivio">
-          {notes.map((note) => (
+          {/* Ordinate qui, non a ogni tasto: modifiedAt cambia mentre si scrive. */}
+          {sortNotes(notes).map((note) => (
             <li key={note.id}>
               <button
                 type="button"
@@ -207,17 +260,43 @@ function StatusBar() {
     const note = activeNote();
     return note ? `${note.text.length} caratteri · ${countWords(note.text)} parole` : '';
   });
-  // Cambia solo aprendo o chiudendo l'ultima scheda, non a ogni tasto.
-  const hasNote = useComputed(() => activeNote() !== undefined);
   const created = useComputed(() => {
     const note = activeNote();
     return note ? `Creata il ${formatDateTime(note.createdAt)}` : '';
   });
   return (
     <footer class="status">
-      {hasNote.value && <span class="unsaved">Modifiche non salvate</span>}
+      <SaveState />
       <span>{stats}</span>
       <span>{created}</span>
     </footer>
+  );
+}
+
+/** Cambia a ogni pausa nella scrittura: si vede ma non si annuncia (lo fa SaveAnnouncer). */
+function SaveState() {
+  const status = saveStatus.value;
+  return (
+    <span class="save-state" data-state={status.state}>
+      {saveStatusText(status)}
+    </span>
+  );
+}
+
+/**
+ * Regioni live sempre montate, fuori dal contenuto reso inerte dai pannelli modali: così
+ * Ctrl+S ed errori si sentono anche con le impostazioni aperte.
+ */
+function SaveAnnouncer() {
+  const status = saveStatus.value;
+  return (
+    <>
+      <div class="sr-only" aria-live="polite">
+        {announcement}
+      </div>
+      <div class="sr-only" role="alert">
+        {status.state === 'error' ? status.message : ''}
+      </div>
+    </>
   );
 }

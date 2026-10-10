@@ -25,6 +25,7 @@ import {
   createNoteInNewTab,
   cycleTabKeepingEditorFocus,
   editorFocusRequest,
+  isRepeatedClick,
   openTab,
 } from '../src/features/tabs/actions';
 import {
@@ -196,14 +197,16 @@ describe('schede e archivio', () => {
     expect(actionError.value).toContain('Spazio di archiviazione esaurito');
   });
 
-  it('doppio clic o Alt+N ripetuto creano una sola nota', async () => {
+  it('due creazioni rapide, la seconda prima che la prima sia salvata, creano due note', async () => {
     await initNotes(() => Promise.resolve(repo));
-    await Promise.all([createNoteInNewTab(), createNoteInNewTab(), createNoteInNewTab()]);
-    expect((await repo.list()).notes).toHaveLength(2);
-    expect(tabsState.value.open).toHaveLength(2);
-    // Finita la creazione, la successiva funziona di nuovo.
-    await createNoteInNewTab();
+    await Promise.all([createNoteInNewTab(), createNoteInNewTab()]);
     expect((await repo.list()).notes).toHaveLength(3);
+    expect(tabsState.value.open).toHaveLength(3);
+  });
+
+  it('il secondo clic di un doppio clic non crea un’altra nota', () => {
+    expect(isRepeatedClick(new MouseEvent('click', { detail: 1 }))).toBe(false);
+    expect(isRepeatedClick(new MouseEvent('click', { detail: 2 }))).toBe(true);
   });
 
   it('le schede di note illeggibili sopravvivono ai cambi di scheda', async () => {

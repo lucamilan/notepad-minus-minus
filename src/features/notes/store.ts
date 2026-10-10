@@ -46,6 +46,13 @@ export function getRepository(): NoteRepository {
 
 type Opener = (events: ConnectionEvents) => Promise<NoteRepository>;
 
+let beforeCloseHook: (() => Promise<void>) | undefined;
+
+/** Lavoro da finire prima che un aggiornamento da un'altra scheda chiuda l'archivio. */
+export function setBeforeCloseHook(hook: (() => Promise<void>) | undefined): void {
+  beforeCloseHook = hook;
+}
+
 /** Apre l'archivio una sola volta; chiamate successive restituiscono la stessa promessa. */
 export function initNotes(open: Opener = openDefault): Promise<void> {
   initialization ??= load(open);
@@ -54,6 +61,7 @@ export function initNotes(open: Opener = openDefault): Promise<void> {
 
 async function load(open: Opener): Promise<void> {
   const events: ConnectionEvents = {
+    beforeClose: () => beforeCloseHook?.() ?? Promise.resolve(),
     onBlocked: () => (notesState.value = { status: 'loading', message: MESSAGES.blocked }),
     onVersionChange: () => fail(MESSAGES.reload),
     onTerminated: () => fail(MESSAGES.terminated),
@@ -111,18 +119,24 @@ export function removeNote(id: string): void {
 }
 
 /**
- * Aggiorna in memoria il testo di una nota aperta, così titolo della scheda e statistiche
- * seguono l'editor. Il salvataggio nell'archivio arriva con F4.
+ * Aggiorna in memoria testo e data di modifica di una nota e restituisce la nota aggiornata
+ * (undefined se non è cambiato nulla). Il salvataggio nell'archivio lo fa `autosave.ts`.
  */
-export function updateNoteText(id: string, text: string): void {
+export function updateNoteText(
+  id: string,
+  text: string,
+  now: number = Date.now(),
+): Note | undefined {
   const state = notesState.value;
-  if (state.status !== 'ready') return;
+  if (state.status !== 'ready') return undefined;
   const index = state.notes.findIndex((note) => note.id === id);
   const current = state.notes[index];
-  if (!current || current.text === text) return;
+  if (!current || current.text === text) return undefined;
+  const updated = { ...current, text, modifiedAt: now };
   const notes = [...state.notes];
-  notes[index] = { ...current, text };
+  notes[index] = updated;
   notesState.value = { ...state, notes };
+  return updated;
 }
 
 /** Solo per i test: dimentica l'inizializzazione precedente. */
