@@ -12,13 +12,17 @@ const OPTIONS: readonly { mode: ViewMode; label: string; icon: () => JSX.Element
 export function ViewModeSwitch() {
   const current = viewMode.value;
   return (
-    <div class="mode-switch" role="group" aria-label="Modalità di visualizzazione">
+    <div
+      class="mode-switch"
+      role="group"
+      aria-label="Modalità di visualizzazione"
+      aria-keyshortcuts="Control+E Meta+E"
+    >
       {OPTIONS.map(({ mode, label, icon }) => (
         <button
           key={mode}
           type="button"
           aria-pressed={current === mode}
-          aria-keyshortcuts="Control+E"
           title={`${label} (Ctrl+E per cambiare)`}
           onClick={() => (viewMode.value = mode)}
         >

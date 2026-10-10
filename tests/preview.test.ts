@@ -80,6 +80,18 @@ describe('anteprima Markdown: rete', () => {
     expect(host.querySelector('img')).toBeNull();
   });
 
+  it('le immagini DATA: maiuscolo restano testo, non un’immagine rotta', () => {
+    const host = render('![x](DATA:image/png;base64,iVBORw0KGgo=)');
+    expect(host.querySelector('img')).toBeNull();
+    expect(host.textContent).toContain('![x](DATA:image/png');
+  });
+
+  it('un link verso un’immagine data: resta solo testo', () => {
+    const host = render('[x](data:image/png;base64,iVBORw0KGgo=)');
+    expect(host.querySelector('a')).toBeNull();
+    expect(host.textContent?.trim()).toBe('x');
+  });
+
   it('mostra le immagini incorporate nel testo (data: raster)', () => {
     const src = 'data:image/png;base64,iVBORw0KGgo=';
     const host = render(`![punto](${src})`);
@@ -94,10 +106,9 @@ describe('anteprima Markdown: rete', () => {
       'http://www.example.com',
       'mailto:a@b.it',
     ]);
-    for (const a of links) {
-      expect(a.getAttribute('target')).toBe('_blank');
-      expect(a.getAttribute('rel')).toBe('noopener noreferrer');
-    }
+    for (const a of links) expect(a.getAttribute('rel')).toBe('noopener noreferrer');
+    // mailto: nella stessa scheda (apre il programma di posta, niente scheda vuota).
+    expect(links.map((a) => a.getAttribute('target'))).toEqual(['_blank', '_blank', null]);
   });
 });
 
@@ -126,6 +137,13 @@ describe('anteprima Markdown: contenuto', () => {
     expect(host.querySelector('h1')?.getAttribute('data-line')).toBe('0');
     expect(host.querySelector('p')?.getAttribute('data-line')).toBe('2');
     expect(host.querySelector('li')?.getAttribute('data-line')).toBe('4');
+  });
+
+  it('anche blocchi di codice e righe orizzontali portano la riga', () => {
+    const host = render('testo\n\n```\ncodice\n```\n\n---\n\n    rientrato');
+    expect(host.querySelector('pre code')?.getAttribute('data-line')).toBe('2');
+    expect(host.querySelector('hr')?.getAttribute('data-line')).toBe('6');
+    expect(host.querySelectorAll('pre')[1]?.getAttribute('data-line')).toBe('8');
   });
 
   it('a capo singolo diventa un a capo, come nel testo', () => {

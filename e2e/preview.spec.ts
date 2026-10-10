@@ -155,3 +155,55 @@ test('contenuti ostili: niente script, stili o richieste esterne, solo testo e a
   expect(errors).toEqual([]);
   expect(foreign).toEqual([]);
 });
+
+test('cliccando i pulsanti il focus resta sul pulsante, anche dopo Ctrl+E', async ({ page }) => {
+  await openApp(page);
+  await editor(page).click();
+  await page.keyboard.press('ControlOrMeta+E'); // da Affiancata ad Anteprima
+  await expect(preview(page)).toBeFocused();
+  await modeButton(page, 'Modifica').click();
+  await modeButton(page, 'Affiancata').click();
+  await expect(modeButton(page, 'Affiancata')).toBeFocused();
+});
+
+test('dalla sola anteprima: Invio torna a scrivere e gli annullamenti restano', async ({
+  page,
+}) => {
+  await openApp(page);
+  await editor(page).click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type(' parola');
+  await modeButton(page, 'Anteprima').click();
+  await expect(preview(page)).toContainText('parola');
+
+  await preview(page).focus();
+  await page.keyboard.press('Enter');
+  await expect(modeButton(page, 'Modifica')).toHaveAttribute('aria-pressed', 'true');
+  await expect(editor(page)).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+Z');
+  await expect(editor(page)).not.toContainText('parola');
+});
+
+test('cambiando scheda nella sola anteprima il focus va all’anteprima della nuova', async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.getByRole('button', { name: '+ Nuova nota' }).click();
+  await page.keyboard.type('Seconda');
+  await modeButton(page, 'Anteprima').click();
+  await preview(page).focus();
+  await page.keyboard.press('Control+Alt+ArrowLeft');
+  await expect(page.getByRole('tab', { selected: true })).toHaveText('Nota di esempio');
+  await expect(preview(page)).toBeFocused();
+  await expect(preview(page).getByRole('heading', { level: 1 })).toHaveText('Nota di esempio');
+});
+
+test('doppio clic su un blocco di codice porta alla sua riga', async ({ page }) => {
+  await openApp(page);
+  await replaceText(page, 'Testo\n\n```\nnpm ci\n```');
+  await modeButton(page, 'Anteprima').click();
+  await preview(page).locator('pre').dblclick();
+  await expect(editor(page)).toBeFocused();
+  await page.keyboard.type('X');
+  await expect(editor(page)).toContainText('X```');
+});

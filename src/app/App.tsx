@@ -235,6 +235,8 @@ function NotePanel({ note }: { note: Note }) {
   useEffect(() => {
     if (previousMode.current === mode) return;
     previousMode.current = mode;
+    // Un vecchio gettone non deve rubare il focus quando l'anteprima si rimonta.
+    setPreviewFocus(undefined);
     const active = document.activeElement;
     const focusWasHere = active === document.body || panelRef.current?.contains(active);
     if (!focusWasHere) return;

@@ -12,8 +12,11 @@ import type Token from 'markdown-it/lib/token.mjs';
  */
 
 const SAFE_LINK = /^(?:https?:|mailto:)/i;
-/** Solo immagini raster incorporate nel testo: non escono in rete (img-src 'self' data:). */
-const SAFE_IMAGE = /^data:image\/(?:png|jpeg|gif|webp);/i;
+/**
+ * Solo immagini raster incorporate nel testo: non escono in rete (img-src 'self' data:).
+ * Minuscolo come lo accetta DOMPurify: "DATA:" diventerebbe un'immagine vuota.
+ */
+const SAFE_IMAGE = /^data:image\/(?:png|jpeg|gif|webp);/;
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true, typographer: false });
 
@@ -27,7 +30,7 @@ const defaultLinkOpen = md.renderer.rules.link_open ?? ((t, i, o, _e, s) => s.re
 md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   const token = tokens[idx];
   if (token) {
-    token.attrSet('target', '_blank');
+    if (/^https?:/i.test(token.attrGet('href') ?? '')) token.attrSet('target', '_blank');
     token.attrSet('rel', 'noopener noreferrer');
   }
   return defaultLinkOpen(tokens, idx, options, env, self);
@@ -60,13 +63,41 @@ const TASK_MARK = /^\[([ xX])\]\s+/;
 md.core.ruler.push('notepad_blocks', (state) => {
   const tokens = state.tokens;
   tokens.forEach((token, index) => {
-    if (token.nesting === 1 && token.block && token.map) {
+    if (token.block && token.map && (token.nesting === 1 || LEAF_BLOCKS.has(token.type))) {
       token.attrSet('data-line', String(token.map[0]));
     }
     if (token.type === 'th_open' || token.type === 'td_open') alignToClass(token);
-    if (token.type === 'inline') markTask(tokens, index, state.Token);
+    if (token.type === 'inline') {
+      markTask(tokens, index, state.Token);
+      unlinkUnsafe(token);
+    }
   });
 });
+
+/** Blocchi senza apertura/chiusura che meritano comunque la riga per il doppio clic. */
+const LEAF_BLOCKS = new Set(['fence', 'code_block', 'hr']);
+
+/**
+ * validateLink ammette anche le immagini data: (valide solo come immagini): un link con quella
+ * destinazione perde il collegamento e resta solo il testo.
+ */
+function unlinkUnsafe(inline: Token): void {
+  const children = inline.children ?? [];
+  children.forEach((child, i) => {
+    if (child.type !== 'link_open' || SAFE_LINK.test(child.attrGet('href') ?? '')) return;
+    const close = children.findIndex(
+      (c, j) => j > i && c.type === 'link_close' && c.level === child.level,
+    );
+    for (const t of [child, children[close]]) {
+      if (!t) continue;
+      t.type = 'text';
+      t.tag = '';
+      t.content = '';
+      t.attrs = null;
+      t.nesting = 0;
+    }
+  });
+}
 
 function alignToClass(token: Token): void {
   const style = token.attrGet('style');
@@ -142,7 +173,9 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {
     const href = node.getAttribute('href') ?? '';
     if (!SAFE_LINK.test(href)) node.removeAttribute('href');
-    node.setAttribute('target', '_blank');
+    // mailto: in una nuova scheda lascerebbe una scheda vuota in alcuni browser.
+    if (/^https?:/i.test(href)) node.setAttribute('target', '_blank');
+    else node.removeAttribute('target');
     node.setAttribute('rel', 'noopener noreferrer');
   } else if (node.tagName === 'IMG') {
     if (!SAFE_IMAGE.test(node.getAttribute('src') ?? '')) node.removeAttribute('src');
