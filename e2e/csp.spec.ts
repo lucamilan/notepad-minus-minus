@@ -1,9 +1,24 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 declare global {
   interface Window {
     __cspViolations: string[];
   }
+}
+
+function watchPage(page: Page, appOrigin: string) {
+  const errors: string[] = [];
+  const foreignRequests: string[] = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('request', (req) => {
+    const url = new URL(req.url());
+    if (url.protocol.startsWith('http') && url.origin !== appOrigin)
+      foreignRequests.push(req.url());
+  });
+  return { errors, foreignRequests };
 }
 
 test.beforeEach(async ({ page }) => {
@@ -15,35 +30,48 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('la pagina si carica senza violazioni CSP, errori o richieste esterne', async ({
+test('la pagina e l’editor funzionano senza violazioni CSP, errori o richieste esterne', async ({
   page,
   baseURL,
 }) => {
-  const errors: string[] = [];
-  const foreignRequests: string[] = [];
-  const appOrigin = new URL(baseURL ?? '').origin;
-
-  page.on('pageerror', (err) => errors.push(err.message));
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text());
-  });
-  page.on('request', (req) => {
-    const url = new URL(req.url());
-    if (url.protocol.startsWith('http') && url.origin !== appOrigin)
-      foreignRequests.push(req.url());
-  });
+  const { errors, foreignRequests } = watchPage(page, new URL(baseURL ?? '').origin);
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'La nuova versione è in costruzione',
-  );
+  const editor = page.getByRole('textbox', { name: 'Testo della nota' });
+  await expect(editor).toContainText('Nota di esempio');
+
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type('\nRiga scritta dal test');
+  await expect(editor).toContainText('Riga scritta dal test');
+  await expect(page.locator('.status')).toContainText('caratteri');
 
   const csp = await page
     .locator('meta[http-equiv="Content-Security-Policy"]')
     .getAttribute('content');
   expect(csp).toContain("default-src 'none'");
+  expect(csp).toContain("style-src 'self'");
   expect(csp).toContain("require-trusted-types-for 'script'");
 
+  // CodeMirror deve usare fogli di stile costruiti nello shadow root, non <style> inline
+  // (che la CSP bloccherebbe lasciando l'editor senza stile).
+  const editorStyles = await page.evaluate(() => {
+    const shadow = document.querySelector('.editor-host')?.shadowRoot;
+    const editor = shadow?.querySelector('.cm-editor');
+    return {
+      pageStyleTags: document.querySelectorAll('style').length,
+      shadowStyleTags: shadow?.querySelectorAll('style').length ?? -1,
+      adoptedSheets: shadow?.adoptedStyleSheets.length ?? 0,
+      editorDisplay: editor ? getComputedStyle(editor).display : null,
+    };
+  });
+  expect(editorStyles).toEqual({
+    pageStyleTags: 0,
+    shadowStyleTags: 0,
+    adoptedSheets: expect.any(Number),
+    editorDisplay: 'flex',
+  });
+  expect(editorStyles.adoptedSheets).toBeGreaterThan(0);
   expect(await page.evaluate(() => window.__cspViolations)).toEqual([]);
   expect(errors).toEqual([]);
   expect(foreignRequests).toEqual([]);
