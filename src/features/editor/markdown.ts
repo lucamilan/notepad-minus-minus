@@ -23,7 +23,12 @@ const markdownHighlight = HighlightStyle.define([
   { tag: tags.strikethrough, textDecoration: 'line-through' },
   { tag: tags.link, color: 'var(--accent)' },
   { tag: tags.url, color: 'var(--muted)', textDecoration: 'underline' },
-  { tag: tags.monospace, backgroundColor: 'var(--code)', borderRadius: '3px' },
+  {
+    tag: tags.monospace,
+    fontFamily: 'var(--f-mono)',
+    backgroundColor: 'var(--code)',
+    borderRadius: '3px',
+  },
   { tag: tags.quote, color: 'var(--muted)', fontStyle: 'italic' },
   // Segni del Markdown (#, *, _, `, >, -, [, ]), etichette e linee orizzontali.
   {

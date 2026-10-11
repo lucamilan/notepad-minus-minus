@@ -83,6 +83,9 @@ test('in zen il testo è centrato e più grande; Ctrl+E cambia ancora modalità'
   expect(zenPad).toBeGreaterThan(normalPad + 100);
   expect(zenSize).toBeGreaterThan(normalSize);
 
+  // Modifica → Dal vivo → Affiancata.
+  await page.keyboard.press('ControlOrMeta+E');
+  await expect(editor(page).locator('.cm-live-h1')).toHaveCount(1);
   await page.keyboard.press('ControlOrMeta+E');
   await expect(page.getByRole('article', { name: 'Anteprima della nota' })).toBeVisible();
   await expect(zenBar(page)).toBeVisible();

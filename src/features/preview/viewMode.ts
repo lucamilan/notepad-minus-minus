@@ -1,9 +1,12 @@
 import { effect, signal } from '@preact/signals';
 
-/** Solo testo, testo e anteprima affiancati, solo anteprima. */
-export type ViewMode = 'edit' | 'split' | 'preview';
+/**
+ * Solo testo (sorgente), testo con il Markdown formattato dal vivo, testo e anteprima
+ * affiancati, solo anteprima.
+ */
+export type ViewMode = 'edit' | 'live' | 'split' | 'preview';
 
-export const VIEW_MODES: readonly ViewMode[] = ['edit', 'split', 'preview'];
+export const VIEW_MODES: readonly ViewMode[] = ['edit', 'live', 'split', 'preview'];
 const STORAGE_KEY = 'notepad:view-mode';
 const DEFAULT_MODE: ViewMode = 'split';
 
@@ -31,7 +34,7 @@ function safeLocalStorage(): Storage | undefined {
 
 export const viewMode = signal<ViewMode>(loadViewMode(safeLocalStorage()));
 
-/** Modalità successiva per Ctrl+E: Modifica → Affiancata → Anteprima → Modifica. */
+/** Modalità successiva per Ctrl+E: Modifica → Dal vivo → Affiancata → Anteprima → Modifica. */
 export function nextViewMode(mode: ViewMode): ViewMode {
   return VIEW_MODES[(VIEW_MODES.indexOf(mode) + 1) % VIEW_MODES.length] ?? DEFAULT_MODE;
 }
