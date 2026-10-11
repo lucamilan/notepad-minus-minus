@@ -45,15 +45,6 @@ export function MoreIcon(props: IconProps) {
   );
 }
 
-export function InfoIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="8" cy="8" r="6" />
-      <path d="M8 7.2v3.6M8 5v.01" />
-    </Icon>
-  );
-}
-
 export function PenIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -172,6 +163,17 @@ export function CopyIcon(props: IconProps) {
     <Icon {...props}>
       <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
       <path d="M10.5 5.5V3.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" />
+    </Icon>
+  );
+}
+
+/** "Chiudi le schede non fissate": una puntina che resta e una × per le altre. */
+export function CloseUnpinnedIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 2.5h3.5l-.4 3 2 2H1l2-2z" />
+      <path d="M4.25 7.5v5" />
+      <path d="M9.5 6.5l4 4M13.5 6.5l-4 4" />
     </Icon>
   );
 }

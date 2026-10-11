@@ -16,6 +16,46 @@ export const NEW_NOTE_TEXT = '# Nuova nota\n\n';
 export const NEW_NOTE_TITLE_RANGE = { anchor: 2, head: 12 } as const;
 
 export const UNTITLED = 'Nota senza titolo';
+
+export const COPY_SUFFIX = '(copia)';
+/**
+ * Prime righe a cui non si può aggiungere testo senza cambiarne il significato Markdown:
+ * blocco di codice (recintato o indentato), definizione di link (il suffisso diventerebbe il
+ * titolo del link) e linea orizzontale.
+ */
+const UNAPPENDABLE_LINE = [
+  /^\s{0,3}(?:`{3,}|~{3,})/,
+  /^(?: {4}|\t)/,
+  /^\s{0,3}\[[^\]]+\]:/,
+  /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/,
+];
+/** Riga di separazione di una tabella: la riga prima è l'intestazione, con le colonne contate. */
+const TABLE_DELIMITER = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
+
+/**
+ * Testo della copia creata da "Duplica": " (copia)" in fondo alla prima riga non vuota, cioè al
+ * titolo (prima di eventuali spazi finali, che possono essere un a capo forzato). Se quella riga
+ * non si può allungare (codice, definizione di link, linea, intestazione di tabella) il
+ * suffisso va su una riga nuova in cima, con lo stesso a capo della nota. Una nota vuota
+ * diventa "(copia)".
+ */
+export function copyText(text: string): string {
+  // Il gruppo nello split tiene i separatori (indici dispari): il testo si ricompone uguale.
+  const lines = text.split(/(\r\n|\r|\n)/);
+  const index = lines.findIndex((line, i) => i % 2 === 0 && line.trim() !== '');
+  const first = lines[index];
+  if (first === undefined) return COPY_SUFFIX;
+  const next = lines[index + 2];
+  if (
+    UNAPPENDABLE_LINE.some((pattern) => pattern.test(first)) ||
+    (next !== undefined && first.includes('|') && TABLE_DELIMITER.test(next))
+  ) {
+    return `${COPY_SUFFIX}${lines[1] ?? '\n'}${text}`;
+  }
+  lines[index] = first.replace(/(\s*)$/, ` ${COPY_SUFFIX}$1`);
+  return lines.join('');
+}
+
 const TAB_TITLE_MAX = 27;
 
 /**
@@ -35,12 +75,18 @@ export function noteTitle(text: string): string {
   return plain || UNTITLED;
 }
 
-/** Titolo della scheda: al massimo 27 caratteri più "...", senza spezzare le emoji. */
+/**
+ * Titolo della scheda: al massimo 27 caratteri più "...", senza spezzare le emoji. Il suffisso
+ * " (copia)" resta visibile anche su un titolo lungo, così copia e originale si distinguono.
+ */
 export function tabTitle(text: string): string {
-  const chars = Array.from(noteTitle(text));
-  return chars.length <= TAB_TITLE_MAX
-    ? chars.join('')
-    : `${chars.slice(0, TAB_TITLE_MAX).join('')}...`;
+  const title = noteTitle(text);
+  const suffix = ` ${COPY_SUFFIX}`;
+  const isCopy = title.endsWith(suffix);
+  const chars = Array.from(isCopy ? title.slice(0, -suffix.length) : title);
+  const room = TAB_TITLE_MAX - (isCopy ? suffix.length : 0);
+  const base = chars.length <= room ? chars.join('') : `${chars.slice(0, room).join('')}...`;
+  return isCopy ? `${base}${suffix}` : base;
 }
 
 export function createNote(

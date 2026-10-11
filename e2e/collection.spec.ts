@@ -247,7 +247,7 @@ test('su schermi stretti la raccolta è un pannello: prende il focus e lo restit
   await expect(editor(page)).toBeFocused();
 });
 
-test('Duplica apre una copia identica e indipendente, che resta dopo il blocco', async ({
+test('Duplica apre una copia con "(copia)" nel titolo, indipendente, che resta dopo il blocco', async ({
   page,
 }) => {
   await seed(page);
@@ -263,10 +263,12 @@ test('Duplica apre una copia identica e indipendente, che resta dopo il blocco',
   await duplicate.click();
   await expect(page.getByRole('tab')).toHaveCount(5);
   const copyTab = page.getByRole('tab', { selected: true });
-  await expect(copyTab).toHaveText('Preventivo Acme');
+  await expect(copyTab).toHaveText('Preventivo Acme (copia)');
   await expect(page.getByRole('tab').last()).toHaveAttribute('aria-selected', 'true');
   await expect(editor(page)).toBeFocused();
-  await expect(editor(page)).toHaveText('# Preventivo Acme#cliente/acmeAnalisi 4 giorniSconto 10%');
+  await expect(editor(page)).toHaveText(
+    '# Preventivo Acme (copia)#cliente/acmeAnalisi 4 giorniSconto 10%',
+  );
   await expect(page.getByRole('button', { name: 'Fissa', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',
@@ -275,13 +277,14 @@ test('Duplica apre una copia identica e indipendente, che resta dopo il blocco',
   await expect(noteItems(page)).toHaveCount(5);
 
   // Il cursore è all'inizio: si scrive sulla copia, l'originale non cambia.
-  await page.keyboard.insertText('Copia: ');
-  await expect(copyTab).toHaveText('Copia: # Preventivo Acme');
+  await page.keyboard.insertText('X');
+  await expect(copyTab).toHaveText('X# Preventivo Acme (copia)');
   const original = page.getByRole('tab', { name: 'Preventivo Acme', exact: true });
   await expect(original).toHaveCount(1);
   await original.click();
   await expect(editor(page)).toContainText('Sconto 10%');
-  await expect(editor(page)).not.toContainText('Copia:');
+  await expect(editor(page)).not.toContainText('X#');
+  await expect(editor(page)).not.toContainText('(copia)');
 
   await expect(page.locator('.save-state')).toHaveText(/^Salvato alle/);
   await page.getByRole('button', { name: 'Blocca', exact: true }).click();
@@ -289,7 +292,7 @@ test('Duplica apre una copia identica e indipendente, che resta dopo il blocco',
   await expect(page.getByRole('tab')).toHaveCount(5);
   await expect(page.getByRole('tab', { selected: true })).toHaveText('Preventivo Acme');
   await expect(editor(page)).toContainText('Sconto 10%');
-  await page.getByRole('tab', { name: 'Copia: # Preventivo Acme' }).click();
+  await page.getByRole('tab', { name: 'X# Preventivo Acme (copia)' }).click();
   await expect(editor(page)).toContainText('Sconto 10%');
   await expect(noteItems(page)).toHaveCount(5);
 });

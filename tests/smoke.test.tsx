@@ -31,11 +31,11 @@ describe('Workspace', () => {
     tabsState.value = { open: [], active: null };
   });
 
-  it("mostra la barra, l'avviso di anteprima e il caricamento delle note", () => {
+  it('mostra la barra, senza avvisi sopra le note, e il caricamento delle note', () => {
     render(<Workspace />, root);
 
     expect(root.querySelector('.logo')?.textContent).toContain('Notepad−−');
-    expect(root.querySelector('.notice')?.textContent).toContain('cifrate');
+    expect(root.querySelector('.notice')).toBeNull();
     expect(root.querySelector('.lock-button')?.getAttribute('aria-keyshortcuts')).toBe('Alt+L');
     expect(root.querySelector('.workspace')?.textContent).toContain('Apertura delle note');
   });

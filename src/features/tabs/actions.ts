@@ -4,7 +4,13 @@ import { collectionFilter } from '../collection/state';
 import { matchesFilter, NO_FILTER, type CollectionFilter } from '../collection/views';
 import { discardPendingSave } from '../notes/autosave';
 import { announceSaved, changedElsewhere } from '../notes/crossTab';
-import { createNote, NEW_NOTE_TEXT, NEW_NOTE_TITLE_RANGE, type Note } from '../notes/note';
+import {
+  copyText,
+  createNote,
+  NEW_NOTE_TEXT,
+  NEW_NOTE_TITLE_RANGE,
+  type Note,
+} from '../notes/note';
 import {
   addNote,
   currentLockEpoch,
@@ -95,6 +101,20 @@ export function closeAllTabs(): void {
   closeTabs(tabsState.value.open.filter((id) => !waiting.has(id)));
 }
 
+/** Schede che "Chiudi le schede non fissate" chiuderebbe: tutte tranne fissate e in attesa. */
+export function unpinnedTabIds(): string[] {
+  const state = notesState.value;
+  if (state.status !== 'ready') return [];
+  const pinned = new Set(state.notes.filter((note) => note.pinned).map((note) => note.id));
+  const waiting = changedElsewhere.value;
+  return tabsState.value.open.filter((id) => !pinned.has(id) && !waiting.has(id));
+}
+
+/** Come "Chiudi tutte", ma restano aperte anche le note fissate. */
+export function closeUnpinnedTabs(): void {
+  closeTabs(unpinnedTabIds());
+}
+
 export function closeActiveTab(): void {
   const { active } = tabsState.value;
   if (active !== null) closeTab(active);
@@ -133,16 +153,17 @@ export async function createNoteInNewTab(now: number = Date.now()): Promise<void
 }
 
 /**
- * Duplica la nota: stesso testo di quello in memoria (modifiche non ancora salvate comprese),
- * id e date nuovi, non fissata. Si apre in una scheda nuova col cursore all'inizio, come una
- * nota nuova (stesso percorso di Alt+N, compreso l'annullamento se il salvataggio fallisce).
+ * Duplica la nota: il testo in memoria (modifiche non ancora salvate comprese) con " (copia)"
+ * in fondo al titolo (`copyText`), id e date nuovi, non fissata. Si apre in una scheda nuova
+ * col cursore all'inizio, come una nota nuova (stesso percorso di Alt+N, compreso
+ * l'annullamento se il salvataggio fallisce).
  */
 export async function duplicateNote(id: string, now: number = Date.now()): Promise<void> {
   const state = notesState.value;
   if (state.status !== 'ready') return;
   const source = state.notes.find((note) => note.id === id);
   if (!source) return;
-  if (await openNewNote(createNote(source.text, now), { anchor: 0, head: 0 }, now)) {
+  if (await openNewNote(createNote(copyText(source.text), now), { anchor: 0, head: 0 }, now)) {
     announce('Nota duplicata');
   }
 }

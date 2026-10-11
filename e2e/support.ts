@@ -47,7 +47,8 @@ export async function unlockVault(page: Page, passphrase: string = TEST_PASSPHRA
 export async function openUnlocked(page: Page, path = '/'): Promise<void> {
   await page.goto(path);
   const title = page.locator('#vault-title');
-  await expect(title).toBeVisible();
+  // In Firefox, con molti contesti in parallelo, l'apertura di IndexedDB a volte tarda oltre 5 s.
+  await expect(title).toBeVisible({ timeout: 20_000 });
   if ((await title.textContent()) === 'Proteggi le tue note') await setupVault(page);
   else await unlockVault(page);
 }

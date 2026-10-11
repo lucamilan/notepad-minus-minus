@@ -190,6 +190,28 @@ test('"Chiudi tutte le schede" chiude le schede ma non le note', async ({ page }
   await expect(reopen.filter({ hasText: 'Terza' })).toHaveCount(1);
 });
 
+test('"Chiudi le schede non fissate" lascia aperte solo le note fissate', async ({ page }) => {
+  await openApp(page);
+  const closeUnpinned = page.getByRole('button', { name: 'Chiudi le schede non fissate' });
+  // La nota di esempio, unica scheda e non fissata: il pulsante chiuderebbe solo quella.
+  await expect(closeUnpinned).toBeEnabled();
+  await page.getByRole('button', { name: 'Fissa', exact: true }).click();
+  await expect(closeUnpinned).toBeDisabled();
+  await page.getByRole('button', { name: '+ Nuova nota' }).click();
+  await page.keyboard.type('Seconda');
+  await page.keyboard.press('Alt+KeyN');
+  await page.keyboard.type('Terza');
+  await expect(tabs(page)).toHaveCount(3);
+  await expect(closeUnpinned).toHaveAttribute('title', 'Chiudi le schede non fissate');
+
+  await closeUnpinned.click();
+  await expect(tabs(page)).toHaveCount(1);
+  await expect(tabs(page).first()).toHaveText('Nota di esempio');
+  await expect(tabs(page).first()).toHaveAttribute('aria-selected', 'true');
+  await expect(closeUnpinned).toBeDisabled();
+  await expect(noteItems(page)).toHaveCount(3);
+});
+
 test('Alt+Shift+W chiude tutte le schede; la pagina vuota si usa da tastiera', async ({ page }) => {
   await openApp(page);
   await editor(page).click();
