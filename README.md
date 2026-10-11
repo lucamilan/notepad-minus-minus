@@ -22,25 +22,27 @@ Scrivi in Markdown con anteprima affiancata, organizzi le note con tag nel testo
 - **Note e schede.** Ogni scheda è una nota aperta; il titolo è la prima riga. Chiudere una scheda non elimina la nota: la riapri dalla raccolta o dalla ricerca. "Chiudi le schede non fissate" e "Chiudi tutte le schede" (in fondo alla barra delle schede) le chiudono insieme, tranne le note fissate nel primo caso, sempre senza eliminare nulla; restano aperte solo le note cambiate in un’altra scheda del browser, finché non scegli quale versione tenere. "Duplica" crea una copia della nota, con le modifiche non ancora salvate e "(copia)" in fondo al titolo, e la apre in una scheda nuova. Per eliminare una nota usa "Elimina…", che chiede conferma.
 - **Salvataggio.** È sempre attivo: le modifiche si salvano dopo mezzo secondo di pausa, quando cambi scheda o chiudi la pagina. Lo stato è nella barra in basso.
 - **Anteprima.** Tre modalità: Modifica, Affiancata, Anteprima. Doppio clic su un punto dell’anteprima per scrivere da quella riga. Le liste di attività (`- [ ] da fare`) diventano caselle.
+- **Modalità zen.** "Zen" nella barra in alto o <kbd>Alt</kbd>+<kbd>Z</kbd>: restano solo il testo della nota, in una colonna centrata e più grande, e lo schermo intero del browser (dove c’è; su iPhone solo il layout). Una barra in alto a destra, visibile passandoci sopra, mostra salvataggio e parole ed esce da zen; si vede sempre se il salvataggio ha un problema. Si esce con <kbd>Alt</kbd>+<kbd>Z</kbd> o <kbd>Esc</kbd> (a schermo intero il primo <kbd>Esc</kbd> esce dallo schermo intero).
 - **Tag e raccolta.** Scrivi `#` nel testo e l’editor suggerisce i tag già usati. La raccolta mostra le viste (Tutte, Recenti, Attività aperte, Fissate, Senza tag), i tag per categoria (Clienti, Progetti, Tipi, Altri tag) e le viste che salvi da un filtro. Fissa le note importanti per tenerle in cima.
 - **Ricerca.** Cerca in tutte le note, senza badare a maiuscole e accenti; accetta `#tag` e `is:aperte`, `is:fissate`, `is:recenti`.
 
 ### Scorciatoie da tastiera
 
-| Tasti                                                                      | Azione                                                                    |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| <kbd>Alt</kbd>+<kbd>N</kbd>                                                | Nuova nota in una scheda nuova                                            |
-| <kbd>Alt</kbd>+<kbd>W</kbd>                                                | Chiude la scheda (la nota resta nell’archivio)                            |
-| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>                               | Chiude tutte le schede (le note restano nell’archivio)                    |
-| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd>                 | Scheda precedente / successiva                                            |
-| <kbd>←</kbd> <kbd>→</kbd> <kbd>Home</kbd> <kbd>Fine</kbd>, <kbd>Canc</kbd> | Sulle schede: spostarsi, chiudere la scheda                               |
-| <kbd>Ctrl</kbd>+<kbd>E</kbd>                                               | Modifica → Affiancata → Anteprima                                         |
-| <kbd>Invio</kbd>                                                           | Nella sola anteprima: torna a scrivere                                    |
-| <kbd>Ctrl</kbd>+<kbd>S</kbd>                                               | Salva subito                                                              |
-| <kbd>Ctrl</kbd>+<kbd>K</kbd>                                               | Cerca in tutte le note (<kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Invio</kbd> apre) |
-| <kbd>Ctrl</kbd>+<kbd>&#92;</kbd>                                           | Mostra o nasconde la raccolta                                             |
-| <kbd>Alt</kbd>+<kbd>L</kbd>                                                | Blocca le note in tutte le schede                                         |
-| <kbd>Esc</kbd>                                                             | Chiude menu, dialoghi, ricerca e la raccolta sugli schermi stretti        |
+| Tasti                                                                      | Azione                                                                          |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| <kbd>Alt</kbd>+<kbd>N</kbd>                                                | Nuova nota in una scheda nuova                                                  |
+| <kbd>Alt</kbd>+<kbd>W</kbd>                                                | Chiude la scheda (la nota resta nell’archivio)                                  |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>                               | Chiude tutte le schede (le note restano nell’archivio)                          |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd>                 | Scheda precedente / successiva                                                  |
+| <kbd>←</kbd> <kbd>→</kbd> <kbd>Home</kbd> <kbd>Fine</kbd>, <kbd>Canc</kbd> | Sulle schede: spostarsi, chiudere la scheda                                     |
+| <kbd>Ctrl</kbd>+<kbd>E</kbd>                                               | Modifica → Affiancata → Anteprima                                               |
+| <kbd>Invio</kbd>                                                           | Nella sola anteprima: torna a scrivere                                          |
+| <kbd>Ctrl</kbd>+<kbd>S</kbd>                                               | Salva subito                                                                    |
+| <kbd>Ctrl</kbd>+<kbd>K</kbd>                                               | Cerca in tutte le note (<kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Invio</kbd> apre)       |
+| <kbd>Ctrl</kbd>+<kbd>&#92;</kbd>                                           | Mostra o nasconde la raccolta                                                   |
+| <kbd>Alt</kbd>+<kbd>Z</kbd>                                                | Modalità zen: solo il testo, a schermo intero                                   |
+| <kbd>Alt</kbd>+<kbd>L</kbd>                                                | Blocca le note in tutte le schede                                               |
+| <kbd>Esc</kbd>                                                             | Chiude menu, dialoghi, ricerca e la raccolta sugli schermi stretti; esce da zen |
 
 Su macOS <kbd>Cmd</kbd> vale come <kbd>Ctrl</kbd>.
 

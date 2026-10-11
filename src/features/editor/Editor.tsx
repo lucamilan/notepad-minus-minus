@@ -1,5 +1,5 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { EditorSelection, type Extension } from '@codemirror/state';
+import { Compartment, EditorSelection, type Extension } from '@codemirror/state';
 import {
   drawSelection,
   EditorView,
@@ -22,10 +22,16 @@ interface EditorProps {
   focusRequest?: EditorFocus | undefined;
   /** Estensioni aggiuntive, lette solo alla creazione (es. suggerimenti dei tag). */
   extensions?: readonly Extension[] | undefined;
+  /** Numeri di riga: tolti in modalità zen. Si possono cambiare senza ricreare l'editor. */
+  gutters?: boolean | undefined;
 }
 
 export interface EditorFocus {
   selection?: { anchor: number; head: number } | undefined;
+}
+
+function gutterExtensions(shown: boolean): Extension {
+  return shown ? [lineNumbers(), highlightActiveLineGutter()] : [];
 }
 
 function applyFocus(view: EditorView, request: EditorFocus): void {
@@ -45,8 +51,16 @@ function applyFocus(view: EditorView, request: EditorFocus): void {
 
 // CodeMirror vive in uno shadow root: lì i suoi stili vanno in un foglio costruito
 // (adoptedStyleSheets) invece che in un <style> inline, che la CSP (style-src 'self') bloccherebbe.
-export function Editor({ initialText, label, onChange, focusRequest, extensions }: EditorProps) {
+export function Editor({
+  initialText,
+  label,
+  onChange,
+  focusRequest,
+  extensions,
+  gutters = true,
+}: EditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const gutterCompartment = useRef(new Compartment()).current;
   const viewRef = useRef<EditorView | null>(null);
   const handledRef = useRef<EditorFocus | undefined>(undefined);
   const onChangeRef = useRef(onChange);
@@ -64,8 +78,7 @@ export function Editor({ initialText, label, onChange, focusRequest, extensions 
       root: shadow,
       parent: shadow,
       extensions: [
-        lineNumbers(),
-        highlightActiveLineGutter(),
+        gutterCompartment.of(gutterExtensions(gutters)),
         highlightActiveLine(),
         drawSelection(),
         history(),
@@ -98,6 +111,12 @@ export function Editor({ initialText, label, onChange, focusRequest, extensions 
     handledRef.current = focusRequest;
     applyFocus(view, focusRequest);
   }, [focusRequest]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: gutterCompartment.reconfigure(gutterExtensions(gutters)),
+    });
+  }, [gutters]);
 
   return <div class="editor-host" ref={hostRef} />;
 }
