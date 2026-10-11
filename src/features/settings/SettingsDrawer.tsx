@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { ConfirmDialog } from '../../app/ConfirmDialog';
 import { focusAfterModal } from '../../lib/focus';
 import { AUTO_LOCK_OPTIONS, autoLockMinutes, isAutoLockMinutes } from '../crypto/autoLock';
+import { copyOnSelect, setCopyOnSelect } from '../editor/copyOnSelect';
 import { ChangePassphraseDialog } from '../crypto/ChangePassphraseDialog';
 import { deleteLegacyLeftover, legacyLeftover } from '../crypto/legacy';
 import { lockVault } from '../crypto/vault';
@@ -75,6 +76,23 @@ export function SettingsDrawer({ onClose, onOpenTransfer }: SettingsDrawerProps)
             </div>
           </fieldset>
           <p class="hint">"Sistema" segue l'impostazione chiaro/scuro del computer.</p>
+        </section>
+        <section class="drawer-group" aria-labelledby="editor-title">
+          <h3 id="editor-title" class="group-title">
+            Editor
+          </h3>
+          <label class="drawer-check">
+            <input
+              type="checkbox"
+              checked={copyOnSelect.value}
+              onChange={(e) => setCopyOnSelect(e.currentTarget.checked)}
+            />
+            <span>Copia negli appunti il testo selezionato con il mouse</span>
+          </label>
+          <p class="hint">
+            Come nei terminali: la barra in basso dice quanti caratteri. Gli appunti sono del
+            sistema: altre app e la cronologia degli appunti possono leggerli.
+          </p>
         </section>
         <SecuritySettings />
         <TransferSettings onOpen={onOpenTransfer} />

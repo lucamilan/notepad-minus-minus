@@ -9,6 +9,7 @@ import {
   lineNumbers,
 } from '@codemirror/view';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
+import { copyOnSelectExtension } from './copyOnSelect';
 import { editorTheme } from './editorTheme';
 import { livePreview } from './livePreview';
 import { markdownEditing } from './markdown';
@@ -91,6 +92,7 @@ export function Editor({
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         markdownEditing,
+        copyOnSelectExtension,
         liveCompartment.of(live ? livePreview : []),
         EditorView.contentAttributes.of({ 'aria-label': label, spellcheck: 'false' }),
         EditorView.updateListener.of((update) => {

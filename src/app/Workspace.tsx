@@ -18,6 +18,7 @@ import { lockVault } from '../features/crypto/vault';
 import { noteRevisions } from '../features/notes/crossTab';
 import { SearchDialog } from '../features/search/SearchDialog';
 import { openSearch, searchRequest } from '../features/search/state';
+import { clearCopyNotice, copyNotice, copyNoticeText } from '../features/editor/copyOnSelect';
 import { Editor, type EditorFocus } from '../features/editor/Editor';
 import { noteTitle, sortNotes, type Note } from '../features/notes/note';
 import { editNote, flushSaves, saveStatus, type SaveStatus } from '../features/notes/autosave';
@@ -175,7 +176,13 @@ export function Workspace() {
     exitZen();
     requestAnimationFrame(focusTabs);
   }, [zen]);
-  useEffect(() => () => exitZen(), []);
+  useEffect(
+    () => () => {
+      exitZen();
+      clearCopyNotice();
+    },
+    [],
+  );
 
   // Scorciatoie delle schede: solo con le note pronte e nessun pannello modale aperto.
   useEffect(() => {
@@ -540,6 +547,7 @@ function StatusBar() {
       <SaveState />
       <span>{stats}</span>
       <span>{created}</span>
+      <CopyState />
     </footer>
   );
 }
@@ -558,9 +566,11 @@ function ZenBar() {
     <footer
       class="zen-bar"
       data-alert={status === 'error' || status === 'held' ? '' : undefined}
+      data-notice={copyNotice.value ? '' : undefined}
       aria-label="Modalità zen"
     >
       <SaveState />
+      <CopyState />
       <span class="zen-words">{words}</span>
       <button
         type="button"
@@ -573,6 +583,17 @@ function ZenBar() {
         <span>Esci da zen</span>
       </button>
     </footer>
+  );
+}
+
+/** Esito della copia alla selezione, per qualche secondo (lo annuncia già copyText). */
+function CopyState() {
+  const notice = copyNotice.value;
+  if (!notice) return null;
+  return (
+    <span class="copy-state" data-kind={notice.kind}>
+      {copyNoticeText(notice)}
+    </span>
   );
 }
 
