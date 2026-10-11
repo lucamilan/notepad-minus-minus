@@ -81,3 +81,15 @@ export async function waitForServiceWorker(page: Page): Promise<void> {
     })
     .catch(() => undefined);
 }
+
+/**
+ * Esce da zen con Esc. A schermo intero il browser prende i primi Esc per uscirne (in Firefox
+ * anche più di uno mentre l'uscita è in corso): si ripete finché la barra zen non sparisce.
+ */
+export async function leaveZenWithEscape(page: Page): Promise<void> {
+  const bar = page.locator('.zen-bar');
+  await expect(async () => {
+    if ((await bar.count()) > 0) await page.keyboard.press('Escape');
+    await expect(bar).toHaveCount(0, { timeout: 1000 });
+  }).toPass();
+}

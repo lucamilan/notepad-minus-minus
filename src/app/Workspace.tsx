@@ -2,7 +2,7 @@ import { batch, useComputed } from '@preact/signals';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { applyFilter } from '../features/collection/actions';
 import { Collection } from '../features/collection/Collection';
-import { DeleteDialog, NoteBar } from '../features/collection/NoteBar';
+import { DeleteDialog, ElsewhereNotice, NoteBar } from '../features/collection/NoteBar';
 import {
   deleteRequest,
   narrowScreen,
@@ -39,11 +39,13 @@ import {
 import { NOTE_PANEL_ID, noteTooltip, TabBar, tabElementId } from '../features/tabs/TabBar';
 import { tabsState } from '../features/tabs/tabs';
 import { TransferDialog, type TransferKind } from '../features/transfer/TransferDialog';
+import { toggleZenFromButton } from '../features/zen/actions';
+import { exitZen, toggleZen, zenMode } from '../features/zen/zen';
 import { announcement, announce } from '../lib/announce';
 import { deepActiveElement, focusAfterModal } from '../lib/focus';
 import { formatDateTime, formatTime } from '../lib/format';
 import { AppBar } from './AppBar';
-import { SearchIcon } from './icons';
+import { SearchIcon, ZenIcon } from './icons';
 
 function countWords(text: string): number {
   const trimmed = text.trim();
@@ -81,6 +83,11 @@ function activeNote(): Note | undefined {
   const { active } = tabsState.value;
   if (state.status !== 'ready' || active === null) return undefined;
   return state.notes.find((note) => note.id === active);
+}
+
+/** Zen vale solo con una nota aperta: senza, si torna all'area delle note normale. */
+function zenActive(): boolean {
+  return zenMode.value && activeNote() !== undefined;
 }
 
 /**
@@ -159,6 +166,16 @@ export function Workspace() {
   }, [ready]);
   const modalOpen =
     settingsOpen || search !== null || noteToDelete !== undefined || transferOpen !== null;
+  const zen = zenActive();
+
+  // Zen senza più una nota (scheda chiusa, archivio chiuso): si esce, e il focus va alle schede
+  // che ricompaiono. Al blocco l'area delle note si smonta: si esce anche dallo schermo intero.
+  useEffect(() => {
+    if (!zenMode.value || zen) return;
+    exitZen();
+    requestAnimationFrame(focusTabs);
+  }, [zen]);
+  useEffect(() => () => exitZen(), []);
 
   // Scorciatoie delle schede: solo con le note pronte e nessun pannello modale aperto.
   useEffect(() => {
@@ -175,7 +192,15 @@ export function Workspace() {
       }
       if (ctrlOnly && (e.key === '\\' || e.code === 'Backslash')) {
         e.preventDefault();
-        if (!e.repeat) toggleSidebar();
+        // In zen la raccolta non c'è.
+        if (!e.repeat && !zenMode.value) toggleSidebar();
+        return;
+      }
+      // Esc esce da zen. Con lo schermo intero il primo Esc lo prende il browser per uscirne;
+      // quelli già usati dall'editor (suggerimenti dei tag) arrivano con defaultPrevented.
+      if (e.key === 'Escape' && zenMode.value) {
+        e.preventDefault();
+        exitZen();
         return;
       }
       if (e.key === 'Escape' && narrowScreen.value && sidebarOverlayOpen.value) {
@@ -191,7 +216,10 @@ export function Workspace() {
       }
       if (e.metaKey || notesState.value.status !== 'ready') return;
       const altOnly = e.altKey && !e.ctrlKey && !e.shiftKey;
-      if (altOnly && letter === 'n') {
+      if (altOnly && letter === 'z') {
+        // Alt+Z: modalità zen, solo con una nota aperta.
+        if (!e.repeat && (zenMode.value || activeNote())) toggleZen();
+      } else if (altOnly && letter === 'n') {
         // Tenendo premuto Alt+N la ripetizione del tasto non crea una nota dopo l'altra.
         if (e.repeat) {
           e.preventDefault();
@@ -200,7 +228,10 @@ export function Workspace() {
         void createNoteInNewTab();
       } else if (altOnly && letter === 'w') {
         closeActiveTab();
-        focusTabs();
+        // In zen le schede non si vedono: si continua a scrivere nella nota che resta attiva.
+        const { active } = tabsState.value;
+        if (zenMode.value && active !== null) editorFocusRequest.value = { id: active };
+        else focusTabs();
       } else if (e.altKey && e.shiftKey && !e.ctrlKey && letter === 'w') {
         // Alt+Shift+W: chiude tutte le schede. Nessuna conferma: le note restano nell'archivio.
         closeAllTabs();
@@ -217,19 +248,21 @@ export function Workspace() {
   }, [modalOpen]);
 
   return (
-    <div class="app">
+    <div class="app" data-zen={zen ? '' : undefined}>
       {/* Con un pannello modale aperto il resto è inerte in modo esplicito: showModal() da solo
           non esclude sempre dal Tab il contenuto nello shadow root dell'editor (Chromium). */}
       <div class="app-content" inert={modalOpen}>
-        <AppBar
-          menuButtonRef={menuButtonRef}
-          onOpenSettings={openSettings}
-          onOpenTransfer={openTransfer}
-        />
+        {!zen && (
+          <AppBar
+            menuButtonRef={menuButtonRef}
+            onOpenSettings={openSettings}
+            onOpenTransfer={openTransfer}
+          />
+        )}
         <main class="workspace">
-          <NotesArea />
+          <NotesArea zen={zen} />
         </main>
-        <StatusBar />
+        {zen ? <ZenBar /> : <StatusBar />}
       </div>
       <SaveAnnouncer />
       {settingsOpen && <SettingsDrawer onClose={closeSettings} onOpenTransfer={openTransfer} />}
@@ -242,7 +275,7 @@ export function Workspace() {
   );
 }
 
-function NotesArea() {
+function NotesArea({ zen }: { zen: boolean }) {
   const state = notesState.value;
   if (state.status === 'loading') {
     return <p class="workspace-message">{state.message ?? 'Apertura delle note…'}</p>;
@@ -260,7 +293,7 @@ function NotesArea() {
   const note = activeNote();
   const revision = note ? (noteRevisions.value.get(note.id) ?? 0) : 0;
   const overlay = narrowScreen.value;
-  const showCollection = sidebarVisible();
+  const showCollection = !zen && sidebarVisible();
   return (
     <div class="workspace-body" data-collection={showCollection ? 'shown' : 'hidden'}>
       <CollectionFocus shown={showCollection} overlay={overlay} />
@@ -286,11 +319,12 @@ function NotesArea() {
             {error}
           </p>
         )}
-        <TabBar notes={state.notes} />
-        {note && <NoteBar note={note} />}
+        {!zen && <TabBar notes={state.notes} />}
+        {/* In zen resta solo l'avviso tra schede del browser, che aspetta una scelta. */}
+        {note && (zen ? <ElsewhereNotice id={note.id} /> : <NoteBar note={note} />)}
         {/* La revisione cambia quando si carica la versione di un'altra scheda: editor nuovo. */}
         {note ? (
-          <NotePanel key={`${note.id}:${revision}`} note={note} />
+          <NotePanel key={`${note.id}:${revision}`} note={note} zen={zen} />
         ) : (
           <NoOpenNotes notes={state.notes} />
         )}
@@ -333,7 +367,7 @@ function lineStart(text: string, line: number): number {
   return offset;
 }
 
-function NotePanel({ note }: { note: Note }) {
+function NotePanel({ note, zen }: { note: Note; zen: boolean }) {
   const mode = viewMode.value;
   const panelRef = useRef<HTMLDivElement>(null);
   // I conteggi si leggono al momento del suggerimento: le note cambiano mentre si scrive.
@@ -405,6 +439,7 @@ function NotePanel({ note }: { note: Note }) {
           extensions={extensions}
           initialText={note.text}
           label="Testo della nota"
+          gutters={!zen}
           focusRequest={editorFocus}
           onChange={(text) => {
             recordActivity();
@@ -504,6 +539,38 @@ function StatusBar() {
       <SaveState />
       <span>{stats}</span>
       <span>{created}</span>
+    </footer>
+  );
+}
+
+/**
+ * Barra della modalità zen, in alto a destra: si vede passandoci sopra o con il focus dentro,
+ * sempre se il salvataggio ha un problema o aspetta una scelta.
+ */
+function ZenBar() {
+  const words = useComputed(() => {
+    const note = activeNote();
+    return note ? `${countWords(note.text)} parole` : '';
+  });
+  const status = saveStatus.value.state;
+  return (
+    <footer
+      class="zen-bar"
+      data-alert={status === 'error' || status === 'held' ? '' : undefined}
+      aria-label="Modalità zen"
+    >
+      <SaveState />
+      <span class="zen-words">{words}</span>
+      <button
+        type="button"
+        class="small-button"
+        aria-keyshortcuts="Alt+Z Escape"
+        title="Torna alla vista normale (Alt+Z o Esc)"
+        onClick={toggleZenFromButton}
+      >
+        <ZenIcon />
+        <span>Esci da zen</span>
+      </button>
     </footer>
   );
 }

@@ -6,8 +6,10 @@ import { lockVault } from '../features/crypto/vault';
 import { notesState } from '../features/notes/store';
 import { ViewModeSwitch } from '../features/preview/ViewModeSwitch';
 import { openSearch } from '../features/search/state';
+import { tabsState } from '../features/tabs/tabs';
 import type { TransferKind } from '../features/transfer/TransferDialog';
-import { DeviceIcon, LockIcon, MoreIcon, SearchIcon, SidebarIcon } from './icons';
+import { toggleZenFromButton } from '../features/zen/actions';
+import { DeviceIcon, LockIcon, MoreIcon, SearchIcon, SidebarIcon, ZenIcon } from './icons';
 
 interface AppBarProps {
   menuButtonRef: RefObject<HTMLButtonElement>;
@@ -110,6 +112,18 @@ export function AppBar({ menuButtonRef, onOpenSettings, onOpenTransfer }: AppBar
         </button>
       )}
       <ViewModeSwitch />
+      {ready && tabsState.value.active !== null && (
+        <button
+          type="button"
+          class="icon-button zen-button"
+          aria-keyshortcuts="Alt+Z"
+          title="Solo il testo, a schermo intero (Alt+Z)"
+          onClick={toggleZenFromButton}
+        >
+          <ZenIcon />
+          <span class="bar-label">Zen</span>
+        </button>
+      )}
       <button
         type="button"
         class="icon-button lock-button"

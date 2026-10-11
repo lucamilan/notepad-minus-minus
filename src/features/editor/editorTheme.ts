@@ -13,11 +13,14 @@ export const editorTheme = EditorView.theme({
   '&.cm-focused .cm-gutters': { borderRightColor: 'var(--accent)', borderRightWidth: '2px' },
   '.cm-scroller': {
     fontFamily: 'var(--f-mono)',
-    fontSize: '0.88rem',
+    // Più grande in modalità zen (--editor-font-size su .app[data-zen]).
+    fontSize: 'var(--editor-font-size, 0.88rem)',
     lineHeight: '1.7',
   },
-  '.cm-content': { padding: '16px 0', caretColor: 'var(--accent)' },
-  '.cm-line': { padding: '0 20px' },
+  '.cm-content': { padding: 'var(--editor-pad-y, 16px) 0', caretColor: 'var(--accent)' },
+  // In zen il margine laterale centra una colonna di testo (--editor-pad-x, con % e ch risolti
+  // qui sulla riga): le righe restano larghe quanto l'editor, quindi un clic a lato le raggiunge.
+  '.cm-line': { padding: '0 var(--editor-pad-x, 20px)' },
   '.cm-gutters': {
     backgroundColor: 'var(--code)',
     color: 'var(--muted)',

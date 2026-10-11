@@ -901,6 +901,66 @@ button {
   }
 }
 
+/* Modalità zen: niente barre né raccolta, il testo in una colonna centrata. Le variabili
+   attraversano lo shadow root dell'editor (editorTheme.ts). */
+.app[data-zen] {
+  grid-template-rows: minmax(0, 1fr);
+  --editor-font-size: 1rem;
+  --editor-pad-x: max(24px, calc((100% - 72ch) / 2));
+  --editor-pad-y: 48px;
+}
+
+.app[data-zen] .preview {
+  padding-inline: max(28px, calc((100% - 72ch) / 2));
+  font-size: 1.05rem;
+}
+
+.app[data-zen] .preview > * {
+  max-width: none;
+}
+
+.zen-bar {
+  position: fixed;
+  top: 10px;
+  right: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 12px;
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--bar);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  opacity: 0;
+}
+
+/* Si vede passandoci sopra o con il focus; sempre con un problema di salvataggio e sui
+   dispositivi senza puntatore (lì non si può passare sopra). */
+.zen-bar:hover,
+.zen-bar:focus-within,
+.zen-bar[data-alert] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .zen-bar {
+    opacity: 1;
+  }
+
+  .app[data-zen] .workspace {
+    padding-top: 52px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .zen-bar {
+    transition: opacity 0.2s ease;
+  }
+}
+
 /* Avviso di aggiornamento (PWA): non modale, in basso, sopra la barra di stato */
 .update-region {
   position: fixed;

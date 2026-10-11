@@ -145,7 +145,7 @@ export function DeleteDialog({ note }: { note: Note }) {
 }
 
 /** Avviso quando la stessa nota è stata cambiata in un'altra scheda del browser. */
-function ElsewhereNotice({ id }: { id: string }) {
+export function ElsewhereNotice({ id }: { id: string }) {
   const change = changedElsewhere.value.get(id);
   if (!change) return null;
   return (

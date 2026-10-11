@@ -188,3 +188,11 @@ export function CloseAllIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function ZenIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
+    </Icon>
+  );
+}
