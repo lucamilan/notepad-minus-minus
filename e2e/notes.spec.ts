@@ -124,3 +124,19 @@ test('se IndexedDB non è disponibile mostra un messaggio chiaro', async ({ page
   // L'errore originale finisce in console per chi indaga (il testo varia da browser a browser).
   expect(errors.length).toBeGreaterThan(0);
 });
+
+test('la barra di stato resta una riga in fondo e le note occupano il resto', async ({ page }) => {
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(size);
+    await openUnlocked(page);
+    const status = await page.locator('footer.status').boundingBox();
+    const workspace = await page.locator('main.workspace').boundingBox();
+    if (!status || !workspace) throw new Error('layout mancante');
+    expect(status.height).toBeLessThan(60);
+    expect(status.y + status.height).toBeCloseTo(size.height, 0);
+    expect(workspace.height).toBeGreaterThan(size.height / 2);
+  }
+});
