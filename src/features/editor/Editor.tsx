@@ -10,6 +10,7 @@ import {
 } from '@codemirror/view';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { editorTheme } from './editorTheme';
+import { markdownEditing } from './markdown';
 
 interface EditorProps {
   initialText: string;
@@ -84,6 +85,7 @@ export function Editor({
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
+        markdownEditing,
         EditorView.contentAttributes.of({ 'aria-label': label, spellcheck: 'false' }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onChangeRef.current?.(update.state.doc.toString());
