@@ -12,6 +12,7 @@ import {
   resetAutosaveForTests,
 } from '../src/features/notes/autosave';
 import {
+  copyText,
   createNote,
   NEW_NOTE_TEXT,
   NEW_NOTE_TITLE_RANGE,
@@ -32,6 +33,7 @@ import {
   actionError,
   closeActiveTab,
   closeAllTabs,
+  closeUnpinnedTabs,
   closeTab,
   createNoteInNewTab,
   cycleTabKeepingEditorFocus,
@@ -273,6 +275,29 @@ describe('chiudi tutte le schede', () => {
     changedElsewhere.value = new Map();
   });
 
+  it('"Chiudi le schede non fissate" lascia aperte le fissate e quelle in attesa di scelta', async () => {
+    const pinned = { ...createNote('Fissata', 1), pinned: true };
+    const [a, b, waiting] = [createNote('A', 2), createNote('B', 3), createNote('Altrove', 4)];
+    await repo.putMany([pinned, a, b, waiting]);
+    await repo.putMeta(TABS_META_KEY, {
+      open: [a.id, pinned.id, b.id, waiting.id],
+      active: b.id,
+    });
+    await initNotes(() => Promise.resolve(repo));
+    changedElsewhere.value = new Map([[waiting.id, 'modified']]);
+    const putMeta = vi.spyOn(repo, 'putMeta');
+
+    closeUnpinnedTabs();
+    expect(tabsState.value.open).toEqual([pinned.id, waiting.id]);
+    expect(tabsState.value.active).not.toBeNull();
+    expect(putMeta).toHaveBeenCalledTimes(1);
+    expect((await repo.list()).notes).toHaveLength(4);
+
+    // Con solo schede fissate (o in attesa) non c'è nulla da chiudere.
+    closeUnpinnedTabs();
+    expect(tabsState.value.open).toEqual([pinned.id, waiting.id]);
+  });
+
   it('chiude tutte le schede con una sola scrittura e non elimina le note', async () => {
     const [a, b, c] = [createNote('A', 1), createNote('B', 2), createNote('C', 3)];
     await repo.putMany([a, b, c]);
@@ -339,6 +364,45 @@ describe('chiudi tutte le schede', () => {
   });
 });
 
+describe('titolo della copia', () => {
+  it('aggiunge " (copia)" in fondo alla prima riga non vuota, il resto resta uguale', () => {
+    expect(copyText('# Riunione\n#cliente/acme\n- [ ] verbale')).toBe(
+      '# Riunione (copia)\n#cliente/acme\n- [ ] verbale',
+    );
+    expect(copyText('\n\n  Titolo  \r\nsecondo')).toBe('\n\n  Titolo (copia)  \r\nsecondo');
+    expect(noteTitle(copyText('# Preventivo Acme'))).toBe('Preventivo Acme (copia)');
+  });
+
+  it('una nota vuota diventa "(copia)"; un blocco di codice in cima non si rompe', () => {
+    expect(copyText('')).toBe('(copia)');
+    expect(copyText('  \n ')).toBe('(copia)');
+    expect(copyText('```js\nx = 1\n```')).toBe('(copia)\n```js\nx = 1\n```');
+  });
+
+  it('non cambia il significato Markdown della prima riga', () => {
+    // Tabella: il suffisso nell'intestazione cambierebbe il numero di colonne.
+    expect(copyText('| a | b |\n|---|---|\n| 1 | 2 |')).toBe(
+      '(copia)\n| a | b |\n|---|---|\n| 1 | 2 |',
+    );
+    expect(copyText('[x]: https://e.it\ntesto')).toBe('(copia)\n[x]: https://e.it\ntesto');
+    expect(copyText('---\ntesto')).toBe('(copia)\n---\ntesto');
+    expect(copyText('    codice\n')).toBe('(copia)\n    codice\n');
+    // Stesso a capo della nota; l'a capo forzato (due spazi) resta.
+    expect(copyText('```\r\nx\r\n```')).toBe('(copia)\r\n```\r\nx\r\n```');
+    expect(copyText('Titolo  \nriga')).toBe('Titolo (copia)  \nriga');
+    // Titoli setext e attività si possono allungare.
+    expect(copyText('Titolo\n===')).toBe('Titolo (copia)\n===');
+    expect(copyText('- [ ] da fare')).toBe('- [ ] da fare (copia)');
+  });
+
+  it('nella scheda "(copia)" resta visibile anche su un titolo lungo', () => {
+    const long = '# Preventivo cliente Acme marzo 2026';
+    expect(tabTitle(long)).toBe('Preventivo cliente Acme mar...');
+    expect(tabTitle(copyText(long))).toBe('Preventivo cliente ... (copia)');
+    expect(tabTitle(copyText('# Preventivo Acme'))).toBe('Preventivo Acme (copia)');
+  });
+});
+
 describe('duplica la nota', () => {
   let repo: NoteRepository;
   let original: Note;
@@ -385,7 +449,7 @@ describe('duplica la nota', () => {
 
     expect(await repo.get(active ?? '')).toEqual({
       id: active,
-      text: edited?.text,
+      text: copyText(edited?.text ?? ''),
       createdAt: 9000,
       modifiedAt: 9000,
       pinned: false,
@@ -403,7 +467,7 @@ describe('duplica la nota', () => {
     await flushSaves();
     const stored = (await repo.list()).notes;
     expect(stored).toHaveLength(2);
-    expect(stored.map((note) => note.text)).toEqual(['testo nuovo', 'testo nuovo']);
+    expect(stored.map((note) => note.text)).toEqual(['testo nuovo', 'testo nuovo (copia)']);
     expect(stored.find((note) => note.id === original.id)?.pinned).toBe(true);
   });
 

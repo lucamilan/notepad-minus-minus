@@ -242,24 +242,6 @@ button {
   background: var(--sunken);
 }
 
-/* Avviso anteprima */
-.notice {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: var(--warn-soft);
-  color: var(--ink);
-  font-size: 0.82rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.notice svg {
-  color: var(--warn);
-  flex: none;
-}
-
 /* Area di lavoro */
 .workspace {
   min-height: 0;
@@ -388,9 +370,20 @@ button {
   cursor: pointer;
 }
 
-.tab-close-all:hover {
+/* Spazio tra "Chiudi le schede non fissate" e "Chiudi tutte": un clic sbagliato chiuderebbe
+   anche le fissate. */
+.tab-close-all + .tab-close-all {
+  margin-left: 12px;
+}
+
+.tab-close-all:hover:not(:disabled) {
   color: var(--ink);
   border-color: var(--line);
+}
+
+.tab-close-all:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .note-panel {

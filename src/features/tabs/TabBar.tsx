@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { formatDateTime } from '../../lib/format';
 import { noteTitle, tabTitle, type Note } from '../notes/note';
-import { CloseAllIcon } from '../../app/icons';
+import { CloseAllIcon, CloseUnpinnedIcon } from '../../app/icons';
 import {
   closeAllTabs,
   closeTab,
+  closeUnpinnedTabs,
   createNoteInNewTab,
   focusTabs,
   isRepeatedClick,
   openTab,
   tabFocusRequest,
+  unpinnedTabIds,
 } from './actions';
 import { tabsState } from './tabs';
 
@@ -27,7 +29,8 @@ export function noteTooltip(note: Note): string {
  * Schede secondo il pattern ARIA "tabs": una sola scheda nel giro del Tab, frecce/Home/End
  * per spostarsi (attivazione automatica), Canc per chiudere. Il pulsante × è solo per il
  * mouse (nascosto alle tecnologie assistive e fuori dal Tab): da tastiera si usa Canc o Alt+W.
- * In fondo, dopo "+ Nuova nota", "Chiudi tutte le schede" (Alt+Shift+W).
+ * In fondo, dopo "+ Nuova nota", "Chiudi le schede non fissate" e "Chiudi tutte le schede"
+ * (Alt+Shift+W).
  */
 export function TabBar({ notes }: { notes: readonly Note[] }) {
   const { open, active } = tabsState.value;
@@ -139,8 +142,25 @@ export function TabBar({ notes }: { notes: readonly Note[] }) {
         + Nuova nota
       </button>
       {/* Fuori dal tablist: non è una scheda. Senza schede aperte non serve. Lo spaziatore
-          (almeno 24px) la tiene lontana da "+ Nuova nota": un clic sbagliato non chiude tutto. */}
+          (almeno 24px) li tiene lontani da "+ Nuova nota", e 12px separano i due pulsanti tra loro:
+          un clic sbagliato non chiude più del voluto. */}
       {open.length > 0 && <span class="tabs-spacer" aria-hidden="true" />}
+      {open.length > 0 && (
+        <button
+          type="button"
+          class="tab-close-all"
+          title="Chiudi le schede non fissate"
+          // Disattivato se tutte le schede aperte sono di note fissate: non chiuderebbe nulla.
+          disabled={unpinnedTabIds().length === 0}
+          onClick={() => {
+            closeUnpinnedTabs();
+            focusTabs();
+          }}
+        >
+          <CloseUnpinnedIcon />
+          <span class="sr-only">Chiudi le schede non fissate</span>
+        </button>
+      )}
       {open.length > 0 && (
         <button
           type="button"

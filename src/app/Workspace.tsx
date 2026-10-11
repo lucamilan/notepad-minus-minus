@@ -43,7 +43,7 @@ import { announcement, announce } from '../lib/announce';
 import { deepActiveElement, focusAfterModal } from '../lib/focus';
 import { formatDateTime, formatTime } from '../lib/format';
 import { AppBar } from './AppBar';
-import { InfoIcon, SearchIcon } from './icons';
+import { SearchIcon } from './icons';
 
 function countWords(text: string): number {
   const trimmed = text.trim();
@@ -226,14 +226,6 @@ export function Workspace() {
           onOpenSettings={openSettings}
           onOpenTransfer={openTransfer}
         />
-        <p class="notice" role="note">
-          <InfoIcon />
-          <span>
-            Le note sono cifrate con la tua passphrase e restano solo in questo browser: per
-            portarle altrove usa “Esporta note…”. Se dimentichi la passphrase non si possono
-            recuperare.
-          </span>
-        </p>
         <main class="workspace">
           <NotesArea />
         </main>
