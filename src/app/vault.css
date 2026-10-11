@@ -180,6 +180,19 @@
   font-size: 0.9rem;
 }
 
+.drawer-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.drawer-check input {
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
 .change-status:empty {
   margin: 0;
 }

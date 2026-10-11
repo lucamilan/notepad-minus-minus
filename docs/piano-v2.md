@@ -75,11 +75,14 @@ Dopo F9:
 
 - **Dal vivo**: quarta modalità di visualizzazione tra Modifica e Affiancata (<kbd>Ctrl</kbd>+<kbd>E</kbd> la include). Solo l'editor, con il carattere del testo: sulle righe senza cursore né selezione i segni del Markdown spariscono (titoli, enfasi, barrato, codice in linea, citazioni, link con indirizzo e titolo, `<>` dei link automatici), i punti elenco diventano "•", le attività caselle che si spuntano con un clic (cambia `[ ]`/`[x]` nel testo, si salva come ogni modifica), `---` una linea. Sulla riga del cursore torna il sorgente. Restano sorgente, in monospaziato, tabelle, blocchi di codice, HTML e immagini. Solo decorazioni di CodeMirror: il testo della nota non cambia, niente HTML né attributi `style`. Funziona anche in zen.
 
+- **Copia alla selezione**: come nei terminali, il testo selezionato col mouse nell'editor (trascinando, doppio o triplo clic, Maiusc+clic) va negli appunti e la barra di stato (o la barra zen, che si mostra) dice "Copiati N caratteri (R righe)" per 4 secondi; i lettori di schermo lo sentono. Da tastiera niente copia automatica. Preferenza "Copia negli appunti il testo selezionato con il mouse" nelle impostazioni (sezione Editor), attiva di default, in `localStorage`.
+
 Limiti noti e accettati:
 
 - **Origine condivisa**: ogni pagina sotto `lucamilan.github.io` ha la stessa origine dell'app e può leggere o alterare l'archivio cifrato e, a note sbloccate, agire nella pagina. La cifratura protegge la riservatezza a riposo, non l'integrità né una sessione sbloccata. Si risolve solo con un dominio dedicato.
 - **Metadati a riposo**: nell'archivio si vedono il numero di note, la loro dimensione approssimativa, gli identificativi casuali e i parametri della passphrase (sale, iterazioni); le preferenze di `localStorage` (tema, modalità, raccolta, tempo di blocco) sono in chiaro.
 - **Nessun recupero** della passphrase; la chiave dati non ruota al cambio passphrase (chi ha una vecchia copia dell'archivio e la vecchia passphrase può leggere le note di allora).
+- **Appunti**: il testo copiato (anche dalla copia alla selezione) esce dalla cifratura: altre app e la cronologia degli appunti del sistema possono leggerlo. La copia alla selezione si spegne nelle impostazioni.
 - **Dati solo nel browser**: cancellare i dati del sito elimina le note; l'unico backup è l'esportazione `.notepad`.
 - **Aggiornamenti**: arrivano solo quando l'utente preme "Aggiorna"; una scheda rimasta aperta a lungo con la versione vecchia e già aggiornata da un'altra mostra l'avviso e va ricaricata.
 - **CSP in un meta tag** (GitHub Pages non manda header): niente `frame-ancestors` né report delle violazioni.

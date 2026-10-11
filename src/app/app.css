@@ -724,6 +724,14 @@ button {
   color: var(--warn);
 }
 
+.copy-state {
+  color: var(--accent);
+}
+
+.copy-state[data-kind='failed'] {
+  color: var(--warn);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -941,7 +949,8 @@ button {
    dispositivi senza puntatore (lì non si può passare sopra). */
 .zen-bar:hover,
 .zen-bar:focus-within,
-.zen-bar[data-alert] {
+.zen-bar[data-alert],
+.zen-bar[data-notice] {
   opacity: 1;
 }
 
