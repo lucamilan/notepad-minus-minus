@@ -114,6 +114,9 @@ export default defineConfig({
   build: {
     sourcemap: false,
     modulePreload: { polyfill: false },
+    // L'area delle note (Workspace) è un solo chunk caricato dopo lo sblocco, in parallelo con
+    // PBKDF2: con CodeMirror e il Markdown supera i 500 kB predefiniti.
+    chunkSizeWarningLimit: 700,
   },
   test: {
     environment: 'jsdom',
