@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openUnlocked, reloadUnlocked, waitForPendingSaves } from './support';
+import { leaveZenWithEscape, openUnlocked, reloadUnlocked, waitForPendingSaves } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
@@ -41,9 +41,7 @@ test('il pulsante Zen lascia solo il testo; si scrive e si salva; Esc torna indi
   await expect(zenBar(page).locator('.save-state')).toHaveAttribute('data-state', 'saved');
   await expect(zenBar(page)).toContainText('parole');
 
-  await page.keyboard.press('Escape');
-  // A schermo intero il primo Esc può prenderlo il browser.
-  if ((await zenBar(page).count()) > 0) await page.keyboard.press('Escape');
+  await leaveZenWithEscape(page);
   await expectNormalLayout(page);
   await expect(editor(page)).toBeFocused();
 
