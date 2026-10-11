@@ -127,7 +127,8 @@ button {
   display: grid;
   /* minmax(0, …): le schede scorrono dentro la propria barra invece di allargare la pagina. */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto 1fr auto;
+  /* Barra, area di lavoro, barra di stato: la riga elastica è sempre quella delle note. */
+  grid-template-rows: auto 1fr auto;
   position: relative;
 }
 
