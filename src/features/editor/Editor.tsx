@@ -10,6 +10,7 @@ import {
 } from '@codemirror/view';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { editorTheme } from './editorTheme';
+import { livePreview } from './livePreview';
 import { markdownEditing } from './markdown';
 
 interface EditorProps {
@@ -25,6 +26,8 @@ interface EditorProps {
   extensions?: readonly Extension[] | undefined;
   /** Numeri di riga: tolti in modalità zen. Si possono cambiare senza ricreare l'editor. */
   gutters?: boolean | undefined;
+  /** Anteprima dal vivo (modalità "Dal vivo"): segni del Markdown nascosti fuori dal cursore. */
+  live?: boolean | undefined;
 }
 
 export interface EditorFocus {
@@ -59,9 +62,11 @@ export function Editor({
   focusRequest,
   extensions,
   gutters = true,
+  live = false,
 }: EditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const gutterCompartment = useRef(new Compartment()).current;
+  const liveCompartment = useRef(new Compartment()).current;
   const viewRef = useRef<EditorView | null>(null);
   const handledRef = useRef<EditorFocus | undefined>(undefined);
   const onChangeRef = useRef(onChange);
@@ -86,6 +91,7 @@ export function Editor({
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         markdownEditing,
+        liveCompartment.of(live ? livePreview : []),
         EditorView.contentAttributes.of({ 'aria-label': label, spellcheck: 'false' }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onChangeRef.current?.(update.state.doc.toString());
@@ -119,6 +125,10 @@ export function Editor({
       effects: gutterCompartment.reconfigure(gutterExtensions(gutters)),
     });
   }, [gutters]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: liveCompartment.reconfigure(live ? livePreview : []) });
+  }, [live]);
 
   return <div class="editor-host" ref={hostRef} />;
 }

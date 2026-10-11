@@ -50,8 +50,13 @@ test('i pulsanti e Ctrl+E cambiano modalità, che resta dopo il ricaricamento', 
   await expect(preview(page)).toHaveCount(0);
   await expect(editor(page)).toBeVisible();
 
-  // Ctrl+E dall'editor: Affiancata, poi Anteprima con il focus che passa all'anteprima.
+  // Ctrl+E dall'editor: Dal vivo e Affiancata restando nel testo, poi Anteprima con il focus
+  // che passa all'anteprima.
   await editor(page).click();
+  await page.keyboard.press('ControlOrMeta+E');
+  await expect(modeButton(page, 'Dal vivo')).toHaveAttribute('aria-pressed', 'true');
+  await expect(preview(page)).toHaveCount(0);
+  await expect(editor(page)).toBeFocused();
   await page.keyboard.press('ControlOrMeta+E');
   await expect(modeButton(page, 'Affiancata')).toHaveAttribute('aria-pressed', 'true');
   await expect(editor(page)).toBeFocused();

@@ -196,3 +196,11 @@ export function ZenIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function LiveIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 3.5h7M6 3.5v9M10.5 8.5h3M10.5 12h3" />
+    </Icon>
+  );
+}

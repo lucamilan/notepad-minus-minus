@@ -208,7 +208,7 @@ export function Workspace() {
         sidebarOverlayOpen.value = false;
         return;
       }
-      // Ctrl+E (Cmd+E su macOS): Modifica → Affiancata → Anteprima.
+      // Ctrl+E (Cmd+E su macOS): Modifica → Dal vivo → Affiancata → Anteprima.
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && letter === 'e') {
         e.preventDefault();
         if (!e.repeat) viewMode.value = nextViewMode(viewMode.value);
@@ -440,6 +440,7 @@ function NotePanel({ note, zen }: { note: Note; zen: boolean }) {
           initialText={note.text}
           label="Testo della nota"
           gutters={!zen}
+          live={mode === 'live'}
           focusRequest={editorFocus}
           onChange={(text) => {
             recordActivity();
@@ -447,7 +448,7 @@ function NotePanel({ note, zen }: { note: Note; zen: boolean }) {
           }}
         />
       </div>
-      {mode !== 'edit' && (
+      {(mode === 'split' || mode === 'preview') && (
         <Preview
           text={note.text}
           onRequestEdit={editAt}

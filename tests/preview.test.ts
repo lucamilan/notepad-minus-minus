@@ -167,14 +167,16 @@ describe('anteprima Markdown: contenuto', () => {
 });
 
 describe('modalità di visualizzazione', () => {
-  it('Ctrl+E gira tra le tre modalità', () => {
-    expect(nextViewMode('edit')).toBe('split');
+  it('Ctrl+E gira tra le quattro modalità', () => {
+    expect(nextViewMode('edit')).toBe('live');
+    expect(nextViewMode('live')).toBe('split');
     expect(nextViewMode('split')).toBe('preview');
     expect(nextViewMode('preview')).toBe('edit');
   });
 
   it('valori salvati non validi o storage inaccessibile tornano ad "affiancata"', () => {
     expect(loadViewMode({ getItem: () => 'preview' })).toBe('preview');
+    expect(loadViewMode({ getItem: () => 'live' })).toBe('live');
     expect(loadViewMode({ getItem: () => 'boh' })).toBe('split');
     expect(
       loadViewMode({

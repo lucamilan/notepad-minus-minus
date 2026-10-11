@@ -1,9 +1,20 @@
 import type { JSX } from 'preact';
-import { ColumnsIcon, EyeIcon, PenIcon } from '../../app/icons';
+import { ColumnsIcon, EyeIcon, LiveIcon, PenIcon } from '../../app/icons';
 import { viewMode, type ViewMode } from './viewMode';
 
-const OPTIONS: readonly { mode: ViewMode; label: string; icon: () => JSX.Element }[] = [
+const OPTIONS: readonly {
+  mode: ViewMode;
+  label: string;
+  hint?: string;
+  icon: () => JSX.Element;
+}[] = [
   { mode: 'edit', label: 'Modifica', icon: () => <PenIcon /> },
+  {
+    mode: 'live',
+    label: 'Dal vivo',
+    hint: 'Dal vivo: il Markdown formattato mentre scrivi',
+    icon: () => <LiveIcon />,
+  },
   { mode: 'split', label: 'Affiancata', icon: () => <ColumnsIcon /> },
   { mode: 'preview', label: 'Anteprima', icon: () => <EyeIcon /> },
 ];
@@ -18,12 +29,12 @@ export function ViewModeSwitch() {
       aria-label="Modalità di visualizzazione"
       aria-keyshortcuts="Control+E Meta+E"
     >
-      {OPTIONS.map(({ mode, label, icon }) => (
+      {OPTIONS.map(({ mode, label, hint, icon }) => (
         <button
           key={mode}
           type="button"
           aria-pressed={current === mode}
-          title={`${label} (Ctrl+E per cambiare)`}
+          title={`${hint ?? label} (Ctrl+E per cambiare)`}
           onClick={() => (viewMode.value = mode)}
         >
           {icon()}
