@@ -1,4 +1,6 @@
 import { signal } from '@preact/signals';
+import { isProjectTag } from '../collection/project';
+import { isValidTag } from '../collection/views';
 
 /**
  * Schede = note aperte. Chiudere una scheda non elimina la nota: resta nell'archivio.
@@ -110,4 +112,70 @@ export function visibleTabs(
 ): string[] {
   if (!inProject) return state.open;
   return state.open.filter((id) => id === state.active || inProject(id));
+}
+
+/**
+ * Schede di ogni progetto, salvate in `meta` sotto `projectTabs` (cifrate dal codec: la chiave è
+ * fissa, i nomi dei tag stanno solo nel valore). Rientrando in un progetto si riaprono.
+ */
+export const PROJECT_TABS_META_KEY = 'projectTabs';
+
+export type ProjectTabs = Map<string, TabsState>;
+
+/** Ultime schede salvate per progetto, lette all'apertura dell'archivio (svuotate al blocco). */
+export const projectTabsMemory = { current: new Map() as ProjectTabs };
+
+/**
+ * Legge il valore salvato, un elenco di `{ tag, open, active }`: scarta voci non valide, tag
+ * che non sono di progetto, doppioni e una scheda attiva che non è tra quelle aperte.
+ */
+export function parseProjectTabs(value: unknown): ProjectTabs {
+  const result: ProjectTabs = new Map();
+  if (!Array.isArray(value)) return result;
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue;
+    const v = item as Record<string, unknown>;
+    const tag = v['tag'];
+    if (typeof tag !== 'string' || !isValidTag(tag) || !isProjectTag(tag) || result.has(tag)) {
+      continue;
+    }
+    const state = { open: v['open'], active: v['active'] };
+    if (!isTabsState(state)) continue;
+    const open = [...new Set(state.open)];
+    if (open.length === 0) continue;
+    result.set(tag, {
+      open,
+      active: state.active !== null && open.includes(state.active) ? state.active : null,
+    });
+  }
+  return result;
+}
+
+export function projectTabsToSave(
+  tabs: ProjectTabs,
+): { tag: string; open: string[]; active: string | null }[] {
+  return [...tabs].map(([tag, { open, active }]) => ({ tag, open, active }));
+}
+
+/**
+ * Entrando in un progetto: riapre in fondo le sue schede salvate (solo note che esistono e sono
+ * ancora del progetto). Resta attiva la scheda attuale se è del progetto, altrimenti quella
+ * salvata, altrimenti la prima del progetto, altrimenti nessuna.
+ */
+export function withProjectTabs(
+  state: TabsState,
+  saved: TabsState | undefined,
+  inProject: (id: string) => boolean,
+): TabsState {
+  const restored = (saved?.open ?? []).filter((id) => inProject(id) && !state.open.includes(id));
+  const open = restored.length ? [...state.open, ...restored] : state.open;
+  const visible = open.filter(inProject);
+  const savedActive = saved?.active ?? null;
+  const active =
+    state.active !== null && inProject(state.active)
+      ? state.active
+      : savedActive !== null && visible.includes(savedActive)
+        ? savedActive
+        : (visible[0] ?? null);
+  return open === state.open && active === state.active ? state : { open, active };
 }

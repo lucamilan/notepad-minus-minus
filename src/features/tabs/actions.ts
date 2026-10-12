@@ -23,6 +23,10 @@ import {
 import { ensureEditorVisible } from '../preview/viewMode';
 import {
   hiddenTabIds,
+  PROJECT_TABS_META_KEY,
+  parseProjectTabs,
+  projectTabsMemory,
+  projectTabsToSave,
   TABS_META_KEY,
   tabsToSave,
   tabsState,
@@ -30,6 +34,7 @@ import {
   withClosed,
   withCycled,
   withOpened,
+  withProjectTabs,
   type TabsState,
 } from './tabs';
 
@@ -66,6 +71,40 @@ function commit(next: TabsState): void {
     // Archivio chiuso nel frattempo (aggiornamento da un'altra scheda): l'interfaccia lo segnala già.
     console.error('Schede non salvate', error);
   }
+  const project = activeProject.value;
+  if (project) rememberProjectTabs(project.tag, { open: shownTabs(), active: next.active });
+}
+
+/** Scritture delle schede dei progetti, una dopo l'altra (ognuna rilegge quelle salvate). */
+let projectTabsWrite = Promise.resolve();
+
+/** Si risolve quando le schede dei progetti chieste finora sono scritte (o non riuscite). */
+export function projectTabsSaved(): Promise<void> {
+  return projectTabsWrite;
+}
+
+/**
+ * Ricorda le schede del progetto: subito in memoria, poi nell'archivio rileggendo il valore
+ * salvato, così le voci degli altri progetti scritte da un'altra scheda del browser restano.
+ * Senza schede la voce si toglie.
+ */
+function rememberProjectTabs(tag: string, state: TabsState): void {
+  const memory = projectTabsMemory.current;
+  if (state.open.length) memory.set(tag, state);
+  else memory.delete(tag);
+  const epoch = currentLockEpoch();
+  projectTabsWrite = projectTabsWrite
+    .then(async () => {
+      if (currentLockEpoch() !== epoch) return;
+      const repo = getRepository();
+      const stored = parseProjectTabs(await repo.getMeta(PROJECT_TABS_META_KEY));
+      // Bloccate nel frattempo: niente scritture con lo stato di prima.
+      if (currentLockEpoch() !== epoch) return;
+      if (state.open.length) stored.set(tag, state);
+      else stored.delete(tag);
+      await repo.putMeta(PROJECT_TABS_META_KEY, projectTabsToSave(stored));
+    })
+    .catch((error: unknown) => console.error('Schede del progetto non salvate', error));
 }
 
 /**
@@ -86,11 +125,16 @@ export function openTab(id: string): void {
   commit(withOpened(tabsState.value, id));
 }
 
-/** Rende attiva una scheda già aperta, o nessuna (entrando in un progetto senza sue schede). */
+/** Rende attiva una scheda già aperta, o nessuna. */
 export function activateTab(id: string | null): void {
   const state = tabsState.value;
   if (state.active === id || (id !== null && !state.open.includes(id))) return;
   commit({ open: state.open, active: id });
+}
+
+/** Entrando nel progetto `tag`: riapre le sue schede salvate (vedi `withProjectTabs`). */
+export function openProjectTabs(tag: string, inProject: (id: string) => boolean): void {
+  commit(withProjectTabs(tabsState.value, projectTabsMemory.current.get(tag), inProject));
 }
 
 export function closeTab(id: string): void {

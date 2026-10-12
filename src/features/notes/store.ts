@@ -1,7 +1,16 @@
 import { signal } from '@preact/signals';
 import { parseSavedViews, SAVED_VIEWS_META_KEY } from '../collection/views';
 import { savedViews } from '../collection/state';
-import { hiddenTabIds, hiddenTabs, restoreTabs, TABS_META_KEY, tabsState } from '../tabs/tabs';
+import {
+  hiddenTabIds,
+  hiddenTabs,
+  parseProjectTabs,
+  PROJECT_TABS_META_KEY,
+  projectTabsMemory,
+  restoreTabs,
+  TABS_META_KEY,
+  tabsState,
+} from '../tabs/tabs';
 import type { ConnectionEvents } from './database';
 import { sortNotes, type Note } from './note';
 import { loadNotesEnsuringOne, type NoteRepository } from './repository';
@@ -119,6 +128,7 @@ async function load(open: Opener): Promise<void> {
     const { notes, unreadable } = await loadNotesEnsuringOne(repo);
     const savedTabs = await repo.getMeta(TABS_META_KEY);
     const views = parseSavedViews(await repo.getMeta(SAVED_VIEWS_META_KEY));
+    const projectTabs = parseProjectTabs(await repo.getMeta(PROJECT_TABS_META_KEY));
     repository = repo;
     markStored(notes);
     // Le schede prima delle note: l'interfaccia "pronta" deve già sapere quale nota mostrare.
@@ -128,6 +138,7 @@ async function load(open: Opener): Promise<void> {
       notes.map((note) => note.id),
     );
     savedViews.value = views;
+    projectTabsMemory.current = projectTabs;
     notesState.value = { status: 'ready', notes, unreadable };
   } catch (error) {
     console.error(error);
@@ -211,7 +222,7 @@ export function replaceNotes(put: readonly Note[], remove: readonly string[]): v
 }
 
 /**
- * Al blocco: via note, schede e viste salvate dalla memoria, e il repository (che tiene il
+ * Al blocco: via note, schede (anche quelle dei progetti) e viste salvate dalla memoria, e il repository (che tiene il
  * codec con la chiave). Il prossimo sblocco ricarica tutto con initNotes.
  */
 export function resetNotesForLock(): void {
@@ -222,6 +233,7 @@ export function resetNotesForLock(): void {
   notesState.value = { status: 'loading' };
   tabsState.value = { open: [], active: null };
   hiddenTabIds.current = [];
+  projectTabsMemory.current = new Map();
   savedViews.value = [];
 }
 

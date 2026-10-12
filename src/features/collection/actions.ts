@@ -9,7 +9,14 @@ import {
   removeNote,
   updateNote,
 } from '../notes/store';
-import { actionError, activateTab, closeTab, editorFocusRequest, openTab } from '../tabs/actions';
+import {
+  actionError,
+  activateTab,
+  closeTab,
+  editorFocusRequest,
+  openProjectTabs,
+  openTab,
+} from '../tabs/actions';
 import { tabsState } from '../tabs/tabs';
 import { inProject, projectNotes, withoutProjectTag } from './project';
 import {
@@ -130,8 +137,9 @@ export function applyFilter(filter: CollectionFilter): void {
 
 /**
  * Entra nel progetto `tag` (o passa a un altro): restano visibili solo le sue note e le sue
- * schede. Se la scheda attiva non è del progetto diventa attiva la prima sua, o nessuna.
- * Filtro e scheda attiva di prima si ricordano dall'ingresso nel primo progetto.
+ * schede, e si riaprono quelle lasciate aperte l'ultima volta nel progetto. Se la scheda attiva
+ * non è del progetto diventa attiva quella salvata, o la prima sua, o nessuna. Filtro e scheda
+ * attiva di prima si ricordano dall'ingresso nel primo progetto.
  */
 export function enterProject(tag: string): void {
   const state = notesState.value;
@@ -145,8 +153,7 @@ export function enterProject(tag: string): void {
       previousActive: current?.previousActive ?? tabsState.value.active,
     };
     collectionFilter.value = NO_FILTER;
-    const { open, active } = tabsState.value;
-    if (active === null || !ids.has(active)) activateTab(open.find((id) => ids.has(id)) ?? null);
+    openProjectTabs(tag, (id) => ids.has(id));
   });
   const count = ids.size;
   announce(`Progetto ${tagLabel(tag)}: ${count === 1 ? '1 nota' : `${count} note`}`);
