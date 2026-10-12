@@ -36,14 +36,19 @@ import {
   createNoteInNewTab,
   cycleTabKeepingEditorFocus,
   openTab,
+  projectTabsSaved,
   shownTabs,
 } from '../src/features/tabs/actions';
 import {
+  parseProjectTabs,
+  PROJECT_TABS_META_KEY,
+  projectTabsMemory,
   TABS_META_KEY,
   tabsState,
   visibleTabs,
   withClosed,
   withCycled,
+  withProjectTabs,
 } from '../src/features/tabs/tabs';
 
 describe('progetto: funzioni pure', () => {
@@ -85,6 +90,50 @@ describe('progetto: funzioni pure', () => {
     expect(withClosed(s(['x', 'c'], 'c'), 'c', ['c'])).toEqual(s(['x'], null));
     expect(withCycled(state, 1, visible).active).toBe('c');
     expect(withCycled(state, -2, visible).active).toBe('c');
+  });
+});
+
+describe('schede per progetto: funzioni pure', () => {
+  const s = (open: string[], active: string | null) => ({ open, active });
+
+  it('legge solo voci valide di progetti', () => {
+    const parsed = parseProjectTabs([
+      { tag: 'progetto/portale', open: ['a', 'b', 'a'], active: 'b' },
+      { tag: 'progetto/sito', open: ['c'], active: 'x' },
+      { tag: 'cliente/acme', open: ['d'], active: 'd' },
+      { tag: 'Progetto/Maiuscolo', open: ['e'], active: null },
+      { tag: 'progetto/portale', open: ['z'], active: 'z' },
+      { tag: 'progetto/vuoto', open: [], active: null },
+      { tag: 'progetto/rotto', open: 'a', active: null },
+      null,
+    ]);
+    expect([...parsed]).toEqual([
+      ['progetto/portale', s(['a', 'b'], 'b')],
+      ['progetto/sito', s(['c'], null)],
+    ]);
+    expect(parseProjectTabs({ 'progetto/portale': s(['a'], 'a') }).size).toBe(0);
+    expect(parseProjectTabs(undefined).size).toBe(0);
+  });
+
+  it('entrando riapre le schede salvate del progetto in fondo', () => {
+    const inProject = (id: string) => ['a', 'b', 'c'].includes(id);
+    // La scheda attiva del progetto resta attiva.
+    expect(withProjectTabs(s(['x', 'a'], 'a'), s(['b', 'a'], 'b'), inProject)).toEqual(
+      s(['x', 'a', 'b'], 'a'),
+    );
+    // Fuori dal progetto: diventa attiva quella salvata.
+    expect(withProjectTabs(s(['x'], 'x'), s(['b', 'c'], 'c'), inProject)).toEqual(
+      s(['x', 'b', 'c'], 'c'),
+    );
+    // Note eliminate o non più del progetto non si riaprono.
+    expect(withProjectTabs(s(['x'], 'x'), s(['gone', 'b'], 'gone'), inProject)).toEqual(
+      s(['x', 'b'], 'b'),
+    );
+    // Senza voce salvata: la prima del progetto, o nessuna.
+    expect(withProjectTabs(s(['x', 'c'], 'x'), undefined, inProject)).toEqual(s(['x', 'c'], 'c'));
+    expect(withProjectTabs(s(['x'], 'x'), undefined, inProject)).toEqual(s(['x'], null));
+    const same = s(['a'], 'a');
+    expect(withProjectTabs(same, s(['a'], 'a'), inProject)).toBe(same);
   });
 });
 
@@ -194,6 +243,56 @@ describe('modalità progetto', () => {
     openNoteFromCollection(spesa.id);
     expect(activeProject.value).toBeNull();
     expect(tabsState.value.active).toBe(spesa.id);
+  });
+
+  it('rientrando nel progetto si riaprono le schede lasciate lì, anche dopo la riapertura', async () => {
+    enterProject('progetto/portale');
+    closeTab(portale.id);
+    expect(shownTabs()).toEqual([specifiche.id]);
+    exitProject();
+    // Fuori dal progetto si chiude tutto: rientrando la scheda del progetto torna.
+    closeAllTabs();
+    expect(tabsState.value.open).toEqual([]);
+    enterProject('progetto/portale');
+    expect(shownTabs()).toEqual([specifiche.id]);
+    expect(tabsState.value.active).toBe(specifiche.id);
+
+    await projectTabsSaved();
+    expect(await repo.getMeta(PROJECT_TABS_META_KEY)).toEqual([
+      { tag: 'progetto/portale', open: [specifiche.id], active: specifiche.id },
+    ]);
+
+    // Riapertura dell'archivio (ricaricamento): la voce si rilegge.
+    resetNotesStoreForTests();
+    resetCollectionForLock();
+    expect(projectTabsMemory.current.size).toBe(0);
+    await initNotes(() => Promise.resolve(repo));
+    closeAllTabs();
+    enterProject('progetto/portale');
+    expect(shownTabs()).toEqual([specifiche.id]);
+  });
+
+  it('chiudendo tutte le schede del progetto la sua voce si toglie', async () => {
+    enterProject('progetto/portale');
+    closeAllTabs();
+    await projectTabsSaved();
+    expect(await repo.getMeta(PROJECT_TABS_META_KEY)).toEqual([]);
+    exitProject();
+    enterProject('progetto/portale');
+    expect(shownTabs()).toEqual([]);
+  });
+
+  it('non cancella le voci degli altri progetti scritte da un’altra scheda', async () => {
+    await repo.putMeta(PROJECT_TABS_META_KEY, [
+      { tag: 'progetto/sito', open: [altro.id], active: altro.id },
+    ]);
+    enterProject('progetto/portale');
+    closeTab(portale.id);
+    await projectTabsSaved();
+    expect(await repo.getMeta(PROJECT_TABS_META_KEY)).toEqual([
+      { tag: 'progetto/sito', open: [altro.id], active: altro.id },
+      { tag: 'progetto/portale', open: [specifiche.id], active: specifiche.id },
+    ]);
   });
 
   it('al blocco il progetto esce dalla memoria', () => {

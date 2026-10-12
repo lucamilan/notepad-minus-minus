@@ -80,6 +80,12 @@ export interface SavedView extends CollectionFilter {
 
 export const SAVED_VIEWS_META_KEY = 'savedViews';
 const VALID_TAG = /^\p{L}[\p{L}\p{N}_-]*(?:\/[\p{L}\p{N}_-]+)?$/u;
+
+/** Un tag come lo scrive `tagsOf`: in minuscolo, con al più una categoria. */
+export function isValidTag(tag: string): boolean {
+  return tag === tag.toLowerCase() && VALID_TAG.test(tag);
+}
+
 export const SAVED_VIEW_NAME_MAX = 60;
 
 export function parseSavedViews(value: unknown): SavedView[] {

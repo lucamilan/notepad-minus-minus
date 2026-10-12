@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openUnlocked, waitForPendingSaves } from './support';
+import { openUnlocked, reloadUnlocked, waitForPendingSaves } from './support';
 
 test.afterEach(async ({ page }) => waitForPendingSaves(page));
 
@@ -79,4 +79,31 @@ test('la ricerca resta nel progetto; in tutte le note, aprirne una fuori esce', 
   await expect(projectBar(page)).toHaveCount(0);
   await expect(page.getByRole('tab', { selected: true })).toHaveText('Lista spesa');
   await expect(tabs(page)).toHaveCount(4);
+});
+
+test('rientrando nel progetto si ritrovano le sue schede, anche dopo il ricaricamento', async ({
+  page,
+}) => {
+  await seed(page);
+  const openProject = () =>
+    collection(page).getByRole('button', { name: 'Apri il progetto portale' }).click();
+
+  await openProject();
+  await page.getByRole('tab', { name: 'Kickoff portale' }).click();
+  await page.keyboard.press('Delete');
+  await expect(tabs(page)).toHaveText(['Specifiche portale']);
+  await projectBar(page).getByRole('button', { name: 'Esci dal progetto' }).click();
+
+  // Fuori dal progetto si chiude tutto: rientrando la scheda lasciata nel progetto torna.
+  await page.getByRole('button', { name: 'Chiudi tutte le schede' }).click();
+  await expect(tabs(page)).toHaveCount(0);
+  await openProject();
+  await expect(tabs(page)).toHaveText(['Specifiche portale']);
+  await expect(page.getByRole('tab', { selected: true })).toHaveText('Specifiche portale');
+
+  await reloadUnlocked(page);
+  await page.getByRole('button', { name: 'Chiudi tutte le schede' }).click();
+  await expect(tabs(page)).toHaveCount(0);
+  await openProject();
+  await expect(tabs(page)).toHaveText(['Specifiche portale']);
 });
