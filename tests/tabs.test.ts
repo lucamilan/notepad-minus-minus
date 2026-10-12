@@ -16,6 +16,7 @@ import {
   createNote,
   NEW_NOTE_TEXT,
   NEW_NOTE_TITLE_RANGE,
+  noteFileName,
   noteTitle,
   tabTitle,
   UNTITLED,
@@ -78,6 +79,25 @@ describe('titolo della nota', () => {
     expect(tabTitle('a'.repeat(27))).toBe('a'.repeat(27));
     expect(tabTitle('a'.repeat(28))).toBe(`${'a'.repeat(27)}...`);
     expect(tabTitle(`${'a'.repeat(26)}😀😀`)).toBe(`${'a'.repeat(26)}😀...`);
+  });
+
+  it('il nome del file .md è lo slug del titolo', () => {
+    expect(noteFileName('# Riunione *cliente* Acme\nresto')).toBe('riunione-cliente-acme.md');
+    expect(noteFileName('Perché così? Più caffè: 2 tazze!')).toBe(
+      'perche-cosi-piu-caffe-2-tazze.md',
+    );
+    expect(noteFileName('# Preventivo Acme (copia)')).toBe('preventivo-acme-copia.md');
+    expect(noteFileName('Größe ÉTÉ')).toBe('große-ete.md');
+    expect(noteFileName('Привет мир')).toBe('привет-мир.md');
+    expect(noteFileName('नमस्ते दुनिया')).toBe('नमस्ते-दुनिया.md');
+    expect(noteFileName('')).toBe('nota-senza-titolo.md');
+    expect(noteFileName('😀 🎉')).toBe('nota.md');
+    expect(noteFileName('../../etc/passwd')).toBe('etc-passwd.md');
+  });
+
+  it('il nome del file si ferma a 60 caratteri senza "-" in fondo', () => {
+    expect(noteFileName('a'.repeat(80))).toBe(`${'a'.repeat(60)}.md`);
+    expect(noteFileName(`${'a'.repeat(59)} bcd`)).toBe(`${'a'.repeat(59)}.md`);
   });
 
   it('la nota nuova seleziona il proprio titolo', () => {

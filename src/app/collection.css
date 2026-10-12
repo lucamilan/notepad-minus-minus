@@ -444,6 +444,37 @@ kbd {
   border-color: var(--danger);
 }
 
+/* Pulsanti della barra della nota: ognuno col suo colore, sull'icona e al passaggio. */
+.note-bar .pin-button {
+  --button-c: var(--accent);
+}
+
+.note-bar .duplicate-button {
+  --button-c: var(--c-cliente);
+}
+
+.note-bar .save-file-button {
+  --button-c: var(--ok);
+}
+
+.note-bar .delete-button {
+  --button-c: var(--danger);
+}
+
+.note-bar .small-button {
+  color: var(--ink);
+}
+
+.note-bar .small-button svg {
+  color: var(--button-c);
+}
+
+.note-bar .small-button:hover,
+.note-bar .pin-button[aria-pressed='true'] {
+  color: var(--button-c);
+  border-color: var(--button-c);
+}
+
 .icon-button {
   gap: 6px;
   font-size: 0.82rem;
