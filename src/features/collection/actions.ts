@@ -1,4 +1,5 @@
 import { batch } from '@preact/signals';
+import { announce } from '../../lib/announce';
 import { discardPendingSave, restorePendingSave, scheduleSave } from '../notes/autosave';
 import { announceDeleted, announceSavedViewsChanged } from '../notes/crossTab';
 import {
@@ -8,9 +9,19 @@ import {
   removeNote,
   updateNote,
 } from '../notes/store';
-import { actionError, closeTab, editorFocusRequest, openTab } from '../tabs/actions';
-import { collectionFilter, isNarrowScreen, savedViews, sidebarOverlayOpen } from './state';
+import { actionError, activateTab, closeTab, editorFocusRequest, openTab } from '../tabs/actions';
+import { tabsState } from '../tabs/tabs';
+import { inProject, projectNotes, withoutProjectTag } from './project';
 import {
+  activeProject,
+  collectionFilter,
+  isNarrowScreen,
+  savedViews,
+  sidebarOverlayOpen,
+} from './state';
+import { tagLabel } from './tags';
+import {
+  NO_FILTER,
   parseSavedViews,
   sameFilter,
   SAVED_VIEW_NAME_MAX,
@@ -58,9 +69,16 @@ export async function deleteNote(id: string): Promise<boolean> {
   return true;
 }
 
-/** Apre la nota dalla raccolta o dalla ricerca e porta il focus sul testo. */
+/**
+ * Apre la nota dalla raccolta o dalla ricerca e porta il focus sul testo. Una nota fuori dal
+ * progetto (dalla ricerca in tutte le note) fa uscire dal progetto.
+ */
 export function openNoteFromCollection(id: string): void {
+  const project = activeProject.value;
+  const state = notesState.value;
+  const note = state.status === 'ready' ? state.notes.find((n) => n.id === id) : undefined;
   batch(() => {
+    if (project && note && !inProject(note, project.tag)) exitProject();
     editorFocusRequest.value = { id };
     openTab(id);
     // Su schermi stretti la raccolta copre le note: si chiude per mostrare quella scelta.
@@ -105,5 +123,45 @@ export function removeSavedView(target: SavedView): Promise<void> {
 }
 
 export function applyFilter(filter: CollectionFilter): void {
-  collectionFilter.value = filter;
+  // Nel progetto il suo tag è implicito (una vista salvata o un clic sul tag nell'anteprima).
+  const project = activeProject.value;
+  collectionFilter.value = project ? withoutProjectTag(filter, project.tag) : filter;
+}
+
+/**
+ * Entra nel progetto `tag` (o passa a un altro): restano visibili solo le sue note e le sue
+ * schede. Se la scheda attiva non è del progetto diventa attiva la prima sua, o nessuna.
+ * Filtro e scheda attiva di prima si ricordano dall'ingresso nel primo progetto.
+ */
+export function enterProject(tag: string): void {
+  const state = notesState.value;
+  if (state.status !== 'ready') return;
+  const current = activeProject.value;
+  const ids = new Set(projectNotes(state.notes, tag).map((note) => note.id));
+  batch(() => {
+    activeProject.value = {
+      tag,
+      previousFilter: current?.previousFilter ?? collectionFilter.value,
+      previousActive: current?.previousActive ?? tabsState.value.active,
+    };
+    collectionFilter.value = NO_FILTER;
+    const { open, active } = tabsState.value;
+    if (active === null || !ids.has(active)) activateTab(open.find((id) => ids.has(id)) ?? null);
+  });
+  const count = ids.size;
+  announce(`Progetto ${tagLabel(tag)}: ${count === 1 ? '1 nota' : `${count} note`}`);
+}
+
+/**
+ * Esce dal progetto: tornano tutte le schede e il filtro di prima. La nota attiva resta quella
+ * del progetto; senza, torna la scheda che era attiva prima di entrare.
+ */
+export function exitProject(): void {
+  const project = activeProject.value;
+  if (!project) return;
+  batch(() => {
+    activeProject.value = null;
+    collectionFilter.value = project.previousFilter;
+    if (tabsState.value.active === null) activateTab(project.previousActive);
+  });
 }

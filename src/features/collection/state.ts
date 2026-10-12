@@ -1,8 +1,12 @@
 import { effect, signal } from '@preact/signals';
+import type { ActiveProject } from './project';
 import { NO_FILTER, type CollectionFilter, type SavedView } from './views';
 
 /** Filtro attivo della raccolta: vive solo in memoria (contiene nomi di tag). */
 export const collectionFilter = signal<CollectionFilter>(NO_FILTER);
+
+/** Progetto in cui si lavora (modalità progetto), solo in memoria come il filtro. */
+export const activeProject = signal<ActiveProject | null>(null);
 
 /** Nota di cui si chiede conferma dell'eliminazione (il dialogo sta fuori dal contenuto inerte). */
 export const deleteRequest = signal<string | null>(null);
@@ -13,6 +17,7 @@ export const savedViews = signal<readonly SavedView[]>([]);
 /** Al blocco: filtro, viste e richieste contengono tag e id delle note. */
 export function resetCollectionForLock(): void {
   collectionFilter.value = NO_FILTER;
+  activeProject.value = null;
   deleteRequest.value = null;
   savedViews.value = [];
   sidebarOverlayOpen.value = false;

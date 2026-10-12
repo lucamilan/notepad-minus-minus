@@ -10,6 +10,7 @@ import {
   focusTabs,
   isRepeatedClick,
   openTab,
+  shownTabs,
   tabFocusRequest,
   unpinnedTabIds,
 } from './actions';
@@ -30,10 +31,11 @@ export function noteTooltip(note: Note): string {
  * per spostarsi (attivazione automatica), Canc per chiudere. Il pulsante × è solo per il
  * mouse (nascosto alle tecnologie assistive e fuori dal Tab): da tastiera si usa Canc o Alt+W.
  * In fondo, dopo "+ Nuova nota", "Chiudi le schede non fissate" e "Chiudi tutte le schede"
- * (Alt+Shift+W).
+ * (Alt+Shift+W). In modalità progetto mostra solo le schede del progetto (`shownTabs`).
  */
 export function TabBar({ notes }: { notes: readonly Note[] }) {
-  const { open, active } = tabsState.value;
+  const { active } = tabsState.value;
+  const open = shownTabs();
   const focusToken = tabFocusRequest.value;
   const handledToken = useRef(focusToken);
   const newButtonRef = useRef<HTMLButtonElement>(null);
