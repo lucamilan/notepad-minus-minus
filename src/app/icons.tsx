@@ -214,3 +214,11 @@ export function LiveIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function FolderIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.8l1.5 1.7h4.7A1.5 1.5 0 0 1 14 6.2v5.3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" />
+    </Icon>
+  );
+}

@@ -4,7 +4,8 @@ import { deepActiveElement, focusAfterModal } from '../../lib/focus';
 import { formatRelative } from '../../lib/format';
 import { openNoteFromCollection } from '../collection/actions';
 import { TagChip } from '../collection/Collection';
-import { noteInfo } from '../collection/tags';
+import { projectNotes } from '../collection/project';
+import { noteInfo, tagLabel } from '../collection/tags';
 import { noteTitle, type Note } from '../notes/note';
 import { highlight, isEmptyQuery, parseQuery, searchNotes, snippet, type Segment } from './search';
 import { closeSearch } from './state';
@@ -32,13 +33,16 @@ function Highlighted({ segments }: { segments: readonly Segment[] }) {
 /**
  * Ricerca globale (Ctrl+K): <dialog> modale con campo combobox e elenco di risultati
  * (pattern ARIA combobox con aria-activedescendant). Il focus resta nel campo; frecce per
- * scegliere, Invio per aprire, Esc per chiudere tornando dove si era.
+ * scegliere, Invio per aprire, Esc per chiudere tornando dove si era. In modalità progetto
+ * cerca nelle sue note, o in tutte togliendo la spunta (aprirne una di fuori esce dal progetto).
  */
 export function SearchDialog({
-  notes,
+  notes: allNotes,
+  project,
   initialQuery,
 }: {
   notes: readonly Note[];
+  project: string | null;
   initialQuery: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -46,6 +50,12 @@ export function SearchDialog({
   const opener = useRef<Element | null>(deepActiveElement());
   const [query, setQuery] = useState(initialQuery);
   const [selected, setSelected] = useState(0);
+  const [onlyProject, setOnlyProject] = useState(true);
+  const scoped = project !== null && onlyProject;
+  const notes = useMemo(
+    () => (scoped ? projectNotes(allNotes, project) : allNotes),
+    [allNotes, project, scoped],
+  );
 
   const parsed = useMemo(() => parseQuery(query), [query]);
   const filtered = !isEmptyQuery(parsed);
@@ -153,6 +163,19 @@ export function SearchDialog({
           />
           <kbd>Esc</kbd>
         </div>
+        {project !== null && (
+          <label class="search-scope">
+            <input
+              type="checkbox"
+              checked={onlyProject}
+              onChange={(e) => {
+                setOnlyProject(e.currentTarget.checked);
+                setSelected(0);
+              }}
+            />
+            Solo nel progetto {tagLabel(project)}
+          </label>
+        )}
         <div class="search-hints">
           <span>Filtri:</span>
           {FILTER_HINTS.map((hint) => (

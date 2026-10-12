@@ -171,6 +171,57 @@ kbd {
   color: var(--ink);
 }
 
+.nav-project {
+  display: inline-flex;
+  padding: 4px 6px;
+}
+
+.nav-project:hover {
+  color: var(--c-progetto);
+}
+
+/* Modalità progetto: striscia sopra raccolta e note */
+.project-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--line);
+  border-left: 4px solid var(--c-progetto);
+  background: var(--side);
+}
+
+.project-bar > svg {
+  color: var(--c-progetto);
+  flex: none;
+}
+
+.project-bar h2 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.project-kind {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.project-count {
+  font-family: var(--f-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.project-bar button {
+  margin-left: auto;
+}
+
 /* Tag con il pallino del colore della categoria */
 .tag {
   display: inline-flex;
@@ -651,6 +702,14 @@ mark {
   background: transparent;
   color: var(--ink);
   font-size: 1.02rem;
+}
+
+.search-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px 0;
+  font-size: 0.82rem;
 }
 
 .search-hints {

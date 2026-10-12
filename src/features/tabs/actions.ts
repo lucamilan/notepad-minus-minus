@@ -1,6 +1,7 @@
 import { batch, signal } from '@preact/signals';
 import { announce } from '../../lib/announce';
-import { collectionFilter } from '../collection/state';
+import { inProject } from '../collection/project';
+import { activeProject, collectionFilter } from '../collection/state';
 import { matchesFilter, NO_FILTER, type CollectionFilter } from '../collection/views';
 import { discardPendingSave } from '../notes/autosave';
 import { announceSaved, changedElsewhere } from '../notes/crossTab';
@@ -25,6 +26,7 @@ import {
   TABS_META_KEY,
   tabsToSave,
   tabsState,
+  visibleTabs,
   withClosed,
   withCycled,
   withOpened,
@@ -66,18 +68,40 @@ function commit(next: TabsState): void {
   }
 }
 
+/**
+ * Schede mostrate adesso: tutte, o in modalità progetto quelle delle sue note più l'attiva
+ * (vedi `visibleTabs`). Chiusure e cambi di scheda si muovono solo tra queste.
+ */
+export function shownTabs(): string[] {
+  const project = activeProject.value;
+  const state = notesState.value;
+  if (!project || state.status !== 'ready') return tabsState.value.open;
+  const ids = new Set(
+    state.notes.filter((note) => inProject(note, project.tag)).map((note) => note.id),
+  );
+  return visibleTabs(tabsState.value, (id) => ids.has(id));
+}
+
 export function openTab(id: string): void {
   commit(withOpened(tabsState.value, id));
 }
 
+/** Rende attiva una scheda già aperta, o nessuna (entrando in un progetto senza sue schede). */
+export function activateTab(id: string | null): void {
+  const state = tabsState.value;
+  if (state.active === id || (id !== null && !state.open.includes(id))) return;
+  commit({ open: state.open, active: id });
+}
+
 export function closeTab(id: string): void {
-  commit(withClosed(tabsState.value, id));
+  commit(withClosed(tabsState.value, id, shownTabs()));
 }
 
 /** Chiude più schede con un solo salvataggio dello stato (importazione, F8). */
 export function closeTabs(ids: Iterable<string>): void {
+  const visible = shownTabs();
   let next = tabsState.value;
-  for (const id of ids) next = withClosed(next, id);
+  for (const id of ids) next = withClosed(next, id, visible);
   commit(next);
 }
 
@@ -94,11 +118,12 @@ export function focusTabs(): void {
  * Chiude tutte le schede visibili con un solo salvataggio dello stato. Le note restano
  * nell'archivio e le modifiche in coda continuano a salvarsi; le schede nascoste delle note
  * illeggibili restano nello stato salvato (vedi `tabsToSave`). Restano aperte le note cambiate
- * in un'altra scheda del browser: il loro avviso aspetta ancora la scelta della versione.
+ * in un'altra scheda del browser: il loro avviso aspetta ancora la scelta della versione. In un
+ * progetto chiude solo le sue schede: quelle messe da parte restano.
  */
 export function closeAllTabs(): void {
   const waiting = changedElsewhere.value;
-  closeTabs(tabsState.value.open.filter((id) => !waiting.has(id)));
+  closeTabs(shownTabs().filter((id) => !waiting.has(id)));
 }
 
 /** Schede che "Chiudi le schede non fissate" chiuderebbe: tutte tranne fissate e in attesa. */
@@ -107,7 +132,7 @@ export function unpinnedTabIds(): string[] {
   if (state.status !== 'ready') return [];
   const pinned = new Set(state.notes.filter((note) => note.pinned).map((note) => note.id));
   const waiting = changedElsewhere.value;
-  return tabsState.value.open.filter((id) => !pinned.has(id) && !waiting.has(id));
+  return shownTabs().filter((id) => !pinned.has(id) && !waiting.has(id));
 }
 
 /** Come "Chiudi tutte", ma restano aperte anche le note fissate. */
@@ -122,7 +147,7 @@ export function closeActiveTab(): void {
 
 /** Passa a un'altra scheda restando a scrivere: l'editor della nuova scheda prende il focus. */
 export function cycleTabKeepingEditorFocus(delta: number): void {
-  const next = withCycled(tabsState.value, delta);
+  const next = withCycled(tabsState.value, delta, shownTabs());
   if (next.active !== null && next !== tabsState.value) {
     editorFocusRequest.value = { id: next.active };
   }
@@ -136,9 +161,12 @@ export function cycleTabKeepingEditorFocus(delta: number): void {
  */
 export async function createNoteInNewTab(now: number = Date.now()): Promise<void> {
   if (notesState.value.status !== 'ready') return;
-  // Con un filtro attivo la nota nasce già con quei tag (e fissata, nella vista Fissate).
+  // Con un filtro attivo la nota nasce già con quei tag (e fissata, nella vista Fissate); in un
+  // progetto anche con il suo tag, per primo.
   const filter = collectionFilter.value;
-  const tagLine = filter.tags.map((tag) => `#${tag}`).join(' ');
+  const project = activeProject.value?.tag;
+  const tags = project ? [project, ...filter.tags.filter((tag) => tag !== project)] : filter.tags;
+  const tagLine = tags.map((tag) => `#${tag}`).join(' ');
   const note = {
     ...createNote(
       tagLine

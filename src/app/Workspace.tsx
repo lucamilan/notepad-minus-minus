@@ -1,9 +1,11 @@
 import { batch, useComputed } from '@preact/signals';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { applyFilter } from '../features/collection/actions';
+import { applyFilter, exitProject } from '../features/collection/actions';
 import { Collection } from '../features/collection/Collection';
 import { DeleteDialog, ElsewhereNotice, NoteBar } from '../features/collection/NoteBar';
+import { projectNotes } from '../features/collection/project';
 import {
+  activeProject,
   deleteRequest,
   narrowScreen,
   showSidebar,
@@ -12,7 +14,7 @@ import {
   toggleSidebar,
 } from '../features/collection/state';
 import { tagCompletion } from '../features/collection/tagCompletion';
-import { tagCounts } from '../features/collection/tags';
+import { tagCounts, tagLabel } from '../features/collection/tags';
 import { recordActivity } from '../features/crypto/autoLock';
 import { lockVault } from '../features/crypto/vault';
 import { noteRevisions } from '../features/notes/crossTab';
@@ -46,7 +48,7 @@ import { announcement, announce } from '../lib/announce';
 import { deepActiveElement, focusAfterModal } from '../lib/focus';
 import { formatDateTime, formatTime } from '../lib/format';
 import { AppBar } from './AppBar';
-import { SearchIcon, ZenIcon } from './icons';
+import { FolderIcon, SearchIcon, ZenIcon } from './icons';
 
 function countWords(text: string): number {
   const trimmed = text.trim();
@@ -273,7 +275,13 @@ export function Workspace() {
       </div>
       <SaveAnnouncer />
       {settingsOpen && <SettingsDrawer onClose={closeSettings} onOpenTransfer={openTransfer} />}
-      {search && ready && <SearchDialog notes={state.notes} initialQuery={search.query} />}
+      {search && ready && (
+        <SearchDialog
+          notes={state.notes}
+          project={activeProject.value?.tag ?? null}
+          initialQuery={search.query}
+        />
+      )}
       {noteToDelete && <DeleteDialog note={noteToDelete} />}
       {transferOpen && (
         <TransferDialog key={transferOpen} kind={transferOpen} onClose={closeTransfer} />
@@ -301,42 +309,81 @@ function NotesArea({ zen }: { zen: boolean }) {
   const revision = note ? (noteRevisions.value.get(note.id) ?? 0) : 0;
   const overlay = narrowScreen.value;
   const showCollection = !zen && sidebarVisible();
+  // Modalità progetto: raccolta e pagina senza schede vedono solo le note del progetto.
+  const project = activeProject.value?.tag ?? null;
+  const notes = project ? projectNotes(state.notes, project) : state.notes;
   return (
-    <div class="workspace-body" data-collection={showCollection ? 'shown' : 'hidden'}>
-      <CollectionFocus shown={showCollection} overlay={overlay} />
-      {showCollection && <Collection notes={state.notes} />}
-      {showCollection && overlay && (
-        <div
-          class="collection-scrim"
-          aria-hidden="true"
-          onClick={() => (sidebarOverlayOpen.value = false)}
-        />
-      )}
-      {/* Su schermi stretti la raccolta copre le note: sotto, niente Tab né lettore di schermo. */}
-      <div class="workspace-main" inert={showCollection && overlay}>
-        {unreadable > 0 && (
-          <p class="workspace-warning" role="status">
-            {unreadable === 1
-              ? '1 nota non si può leggere: è stata lasciata intatta nell’archivio.'
-              : `${unreadable} note non si possono leggere: sono state lasciate intatte nell’archivio.`}
-          </p>
+    <>
+      {project && !zen && <ProjectBar tag={project} count={notes.length} />}
+      <div class="workspace-body" data-collection={showCollection ? 'shown' : 'hidden'}>
+        <CollectionFocus shown={showCollection} overlay={overlay} />
+        {showCollection && <Collection notes={notes} />}
+        {showCollection && overlay && (
+          <div
+            class="collection-scrim"
+            aria-hidden="true"
+            onClick={() => (sidebarOverlayOpen.value = false)}
+          />
         )}
-        {error && (
-          <p class="workspace-warning" role="alert">
-            {error}
-          </p>
-        )}
-        {!zen && <TabBar notes={state.notes} />}
-        {/* In zen resta solo l'avviso tra schede del browser, che aspetta una scelta. */}
-        {note && (zen ? <ElsewhereNotice id={note.id} /> : <NoteBar note={note} />)}
-        {/* La revisione cambia quando si carica la versione di un'altra scheda: editor nuovo. */}
-        {note ? (
-          <NotePanel key={`${note.id}:${revision}`} note={note} zen={zen} />
-        ) : (
-          <NoOpenNotes notes={state.notes} />
-        )}
+        {/* Su schermi stretti la raccolta copre le note: sotto, niente Tab né lettore di schermo. */}
+        <div class="workspace-main" inert={showCollection && overlay}>
+          {unreadable > 0 && (
+            <p class="workspace-warning" role="status">
+              {unreadable === 1
+                ? '1 nota non si può leggere: è stata lasciata intatta nell’archivio.'
+                : `${unreadable} note non si possono leggere: sono state lasciate intatte nell’archivio.`}
+            </p>
+          )}
+          {error && (
+            <p class="workspace-warning" role="alert">
+              {error}
+            </p>
+          )}
+          {!zen && <TabBar notes={state.notes} />}
+          {/* In zen resta solo l'avviso tra schede del browser, che aspetta una scelta. */}
+          {note && (zen ? <ElsewhereNotice id={note.id} /> : <NoteBar note={note} />)}
+          {/* La revisione cambia quando si carica la versione di un'altra scheda: editor nuovo. */}
+          {note ? (
+            <NotePanel key={`${note.id}:${revision}`} note={note} zen={zen} />
+          ) : (
+            <NoOpenNotes notes={notes} project={project} />
+          )}
+        </div>
       </div>
-    </div>
+    </>
+  );
+}
+
+/**
+ * Striscia della modalità progetto, sopra raccolta e note. Entrando dalla raccolta il pulsante
+ * premuto sparisce (il tag del progetto non si elenca più): il focus viene qui. Uscendo torna
+ * alle schede, che ricompaiono tutte.
+ */
+function ProjectBar({ tag, count }: { tag: string; count: number }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const active = document.activeElement;
+    if (!active || active === document.body) titleRef.current?.focus();
+  }, [tag]);
+  return (
+    <section class="project-bar" aria-labelledby="project-title">
+      <FolderIcon />
+      <h2 id="project-title" ref={titleRef} tabIndex={-1}>
+        <span class="project-kind">Progetto</span> {tagLabel(tag)}
+      </h2>
+      <span class="project-count">{count === 1 ? '1 nota' : `${count} note`}</span>
+      <button
+        type="button"
+        class="small-button"
+        title="Torna a tutte le note e a tutte le schede"
+        onClick={() => {
+          exitProject();
+          focusTabs();
+        }}
+      >
+        Esci dal progetto
+      </button>
+    </section>
   );
 }
 
@@ -473,14 +520,19 @@ function NotePanel({ note, zen }: { note: Note; zen: boolean }) {
 /** Note riaperte dalla pagina "Nessuna nota aperta": le più recenti. */
 const REOPEN_MAX = 50;
 
-/** Nessuna scheda aperta: le note restano nell'archivio e da qui si riaprono. */
-function NoOpenNotes({ notes }: { notes: readonly Note[] }) {
+/**
+ * Nessuna scheda aperta: le note restano nell'archivio e da qui si riaprono. In un progetto
+ * `notes` sono solo le sue.
+ */
+function NoOpenNotes({ notes, project }: { notes: readonly Note[]; project: string | null }) {
   // Con migliaia di note la pagina resterebbe lenta: solo le più recenti, il resto con Cerca.
   const recent = sortNotes(notes).slice(0, REOPEN_MAX);
   const hidden = notes.length - recent.length;
   return (
     <section class="empty" aria-labelledby="empty-title">
-      <h2 id="empty-title">Nessuna nota aperta</h2>
+      <h2 id="empty-title">
+        {project ? `Nessuna nota aperta nel progetto ${tagLabel(project)}` : 'Nessuna nota aperta'}
+      </h2>
       <p>Chiudere una scheda non elimina la nota: puoi riaprirla da qui o crearne una nuova.</p>
       <div class="empty-actions">
         <button

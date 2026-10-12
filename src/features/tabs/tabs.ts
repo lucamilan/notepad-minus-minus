@@ -65,21 +65,49 @@ export function withOpened(state: TabsState, id: string): TabsState {
   return { open, active: id };
 }
 
-/** Chiude la scheda; se era quella attiva passa alla successiva, o alla precedente se era l'ultima. */
-export function withClosed(state: TabsState, id: string): TabsState {
-  const index = state.open.indexOf(id);
-  if (index < 0) return state;
+/**
+ * Chiude la scheda; se era quella attiva passa alla successiva, o alla precedente se era
+ * l'ultima, tra le schede `visible` (in un progetto le altre restano aperte ma messe da parte).
+ */
+export function withClosed(
+  state: TabsState,
+  id: string,
+  visible: readonly string[] = state.open,
+): TabsState {
+  if (!state.open.includes(id)) return state;
   const open = state.open.filter((other) => other !== id);
-  const active =
-    state.active === id ? (open[Math.min(index, open.length - 1)] ?? null) : state.active;
+  if (state.active !== id) return { open, active: state.active };
+  const index = visible.indexOf(id);
+  const remaining = visible.filter((other) => other !== id && open.includes(other));
+  const active = remaining[Math.min(Math.max(index, 0), remaining.length - 1)] ?? null;
   return { open, active };
 }
 
-/** Attiva la scheda a `delta` posizioni da quella attiva, ripartendo dall'altro capo. */
-export function withCycled(state: TabsState, delta: number): TabsState {
-  const count = state.open.length;
+/**
+ * Attiva la scheda a `delta` posizioni da quella attiva tra le schede `visible`, ripartendo
+ * dall'altro capo.
+ */
+export function withCycled(
+  state: TabsState,
+  delta: number,
+  visible: readonly string[] = state.open,
+): TabsState {
+  const count = visible.length;
   if (count === 0) return state;
-  const index = state.active === null ? 0 : state.open.indexOf(state.active);
-  const next = state.open[(((index + delta) % count) + count) % count] ?? null;
+  const index = state.active === null ? 0 : Math.max(visible.indexOf(state.active), 0);
+  const next = visible[(((index + delta) % count) + count) % count] ?? null;
   return next === state.active ? state : { open: state.open, active: next };
+}
+
+/**
+ * Schede da mostrare: in un progetto solo quelle delle sue note (`inProject`) più quella
+ * attiva, che resta anche se la nota ha appena perso il tag; le altre restano aperte, messe da
+ * parte, e tornano uscendo dal progetto.
+ */
+export function visibleTabs(
+  state: TabsState,
+  inProject: ((id: string) => boolean) | null,
+): string[] {
+  if (!inProject) return state.open;
+  return state.open.filter((id) => id === state.active || inProject(id));
 }

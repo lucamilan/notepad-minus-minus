@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   BookmarkIcon,
   ClockIcon,
+  FolderIcon,
   ListIcon,
   PinIcon,
   SearchIcon,
@@ -14,8 +15,15 @@ import { noteTitle, sortNotes, type Note } from '../notes/note';
 import { openSearch } from '../search/state';
 import { createNoteInNewTab, isRepeatedClick } from '../tabs/actions';
 import { tabsState } from '../tabs/tabs';
-import { applyFilter, openNoteFromCollection, removeSavedView, saveCurrentView } from './actions';
-import { collectionFilter, savedViews } from './state';
+import {
+  applyFilter,
+  enterProject,
+  openNoteFromCollection,
+  removeSavedView,
+  saveCurrentView,
+} from './actions';
+import { isProjectTag, withProjectTag } from './project';
+import { activeProject, collectionFilter, savedViews } from './state';
 import {
   CATEGORIES,
   categoryOf,
@@ -56,7 +64,10 @@ export function TagChip({ tag }: { tag: string }) {
   );
 }
 
-/** Raccolta: viste, viste salvate, tag per categoria e l'elenco delle note filtrate. */
+/**
+ * Raccolta: viste, viste salvate, tag per categoria e l'elenco delle note filtrate. In modalità
+ * progetto `notes` sono solo quelle del progetto (le sceglie Workspace).
+ */
 export function Collection({ notes }: { notes: readonly Note[] }) {
   // Al minuto: le date relative ("oggi 15:56") non cambiano a ogni tasto.
   const now = Math.floor(Date.now() / 60_000) * 60_000;
@@ -93,12 +104,23 @@ function NavButton({
   );
 }
 
+/** Il filtro come lo vede una vista salvata: nel progetto comprende il suo tag. */
+function effectiveFilter() {
+  const project = activeProject.value;
+  const filter = collectionFilter.value;
+  return project ? withProjectTag(filter, project.tag) : filter;
+}
+
 function Navigation({ notes, now }: { notes: readonly Note[]; now: number }) {
   const filter = collectionFilter.value;
+  const effective = effectiveFilter();
+  const project = activeProject.value?.tag;
   const views = savedViews.value;
   const counts = tagCounts(notes);
   const groups = new Map<CategoryId, string[]>();
   for (const tag of counts.keys()) {
+    // Nel progetto il suo tag vale per tutte le note: filtrarlo non servirebbe.
+    if (tag === project) continue;
     const category = categoryOf(tag);
     groups.set(category, [...(groups.get(category) ?? []), tag]);
   }
@@ -137,7 +159,7 @@ function Navigation({ notes, now }: { notes: readonly Note[]; now: number }) {
         {views.map((view, index) => (
           <div class="nav-row" key={`${index}:${view.name}`}>
             <NavButton
-              pressed={sameFilter(filter, view)}
+              pressed={sameFilter(effective, view)}
               onClick={() => applyFilter({ view: view.view, tags: [...view.tags] })}
               icon={<BookmarkIcon />}
               label={view.name}
@@ -167,15 +189,35 @@ function Navigation({ notes, now }: { notes: readonly Note[]; now: number }) {
               <span class="tag-dot" data-c={id} aria-hidden="true" />
               {label}
             </h2>
-            {tags.map((tag) => (
-              <NavButton
-                key={tag}
-                pressed={filter.tags.includes(tag)}
-                onClick={() => applyFilter(withTagToggled(filter, tag))}
-                label={tagLabel(tag)}
-                count={counts.get(tag) ?? 0}
-              />
-            ))}
+            {tags.map((tag) =>
+              isProjectTag(tag) ? (
+                <div class="nav-row" key={tag}>
+                  <NavButton
+                    pressed={filter.tags.includes(tag)}
+                    onClick={() => applyFilter(withTagToggled(filter, tag))}
+                    label={tagLabel(tag)}
+                    count={counts.get(tag) ?? 0}
+                  />
+                  <button
+                    type="button"
+                    class="nav-remove nav-project"
+                    aria-label={`Apri il progetto ${tagLabel(tag)}`}
+                    title="Apri il progetto: solo le sue note e le sue schede"
+                    onClick={() => enterProject(tag)}
+                  >
+                    <FolderIcon />
+                  </button>
+                </div>
+              ) : (
+                <NavButton
+                  key={tag}
+                  pressed={filter.tags.includes(tag)}
+                  onClick={() => applyFilter(withTagToggled(filter, tag))}
+                  label={tagLabel(tag)}
+                  count={counts.get(tag) ?? 0}
+                />
+              ),
+            )}
           </section>
         );
       })}
@@ -185,8 +227,10 @@ function Navigation({ notes, now }: { notes: readonly Note[]; now: number }) {
 
 function NoteList({ notes, now }: { notes: readonly Note[]; now: number }) {
   const filter = collectionFilter.value;
+  const effective = effectiveFilter();
+  const project = activeProject.value?.tag;
   const active = tabsState.value.active;
-  const saved = savedViews.value.find((view) => sameFilter(filter, view));
+  const saved = savedViews.value.find((view) => sameFilter(effective, view));
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
   const nameRef = useRef<HTMLInputElement>(null);
@@ -194,7 +238,12 @@ function NoteList({ notes, now }: { notes: readonly Note[]; now: number }) {
   const shown = sortNotes(notes.filter((note) => matchesFilter(note, filter, now)));
   const view = viewDefinition(filter.view);
   const title =
-    saved?.name ?? (filter.tags.length && filter.view === 'all' ? 'Filtrate' : view.label);
+    saved?.name ??
+    (filter.tags.length && filter.view === 'all'
+      ? 'Filtrate'
+      : project && !filtered
+        ? tagLabel(project)
+        : view.label);
 
   useEffect(() => setNaming(false), [filter]);
   useEffect(() => {
@@ -249,7 +298,7 @@ function NoteList({ notes, now }: { notes: readonly Note[]; now: number }) {
                 type="button"
                 class="link-button"
                 onClick={() => {
-                  setName(suggestViewName(filter));
+                  setName(suggestViewName(effective));
                   setNaming(true);
                 }}
               >
@@ -263,7 +312,7 @@ function NoteList({ notes, now }: { notes: readonly Note[]; now: number }) {
             class="save-view"
             onSubmit={(e) => {
               e.preventDefault();
-              void saveCurrentView(name || suggestViewName(filter), filter);
+              void saveCurrentView(name || suggestViewName(effective), effective);
               setNaming(false);
             }}
           >
@@ -285,8 +334,14 @@ function NoteList({ notes, now }: { notes: readonly Note[]; now: number }) {
             </button>
           </form>
         )}
-        {filter.tags.length > 0 && (
-          <p class="note-list-hint">Le nuove note riceveranno questi tag.</p>
+        {filter.tags.length > 0 ? (
+          <p class="note-list-hint">
+            {project
+              ? `Le nuove note riceveranno #${project} e questi tag.`
+              : 'Le nuove note riceveranno questi tag.'}
+          </p>
+        ) : (
+          project && <p class="note-list-hint">Le nuove note riceveranno #{project}.</p>
         )}
       </div>
       {shown.length === 0 ? (
