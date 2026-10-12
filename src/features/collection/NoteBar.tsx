@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { CopyIcon, PinIcon, TrashIcon } from '../../app/icons';
+import { CopyIcon, PinIcon, SaveFileIcon, TrashIcon } from '../../app/icons';
 import { focusAfterModal } from '../../lib/focus';
 import { formatRelative } from '../../lib/format';
 import { changedElsewhere, keepThisVersion, loadLatestVersion } from '../notes/crossTab';
 import { noteTitle, type Note } from '../notes/note';
 import { duplicateNote, focusTabs, isRepeatedClick } from '../tabs/actions';
+import { saveNoteAsMarkdown } from '../transfer/markdownFile';
 import { deleteNote, applyFilter, togglePinned } from './actions';
 import { TagChip } from './Collection';
 import { deleteRequest, showSidebar } from './state';
 import { categoryOf, noteInfo } from './tags';
 
-/** Barra sopra il testo: fissa, duplica, tag della nota (filtrano la raccolta), data, elimina. */
+/** Barra sopra il testo: fissa, duplica, salva .md, tag della nota (filtrano la raccolta), data, elimina. */
 export function NoteBar({ note }: { note: Note }) {
   const { tags } = noteInfo(note);
   return (
@@ -37,6 +38,15 @@ export function NoteBar({ note }: { note: Note }) {
         >
           <CopyIcon />
           <span>Duplica</span>
+        </button>
+        <button
+          type="button"
+          class="small-button save-file-button"
+          title="Salva la nota in un file Markdown (.md), non cifrato"
+          onClick={() => void saveNoteAsMarkdown(note.id)}
+        >
+          <SaveFileIcon />
+          <span>Salva .md</span>
         </button>
         <span class="note-tags">
           {tags.length === 0 ? (

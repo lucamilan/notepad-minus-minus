@@ -89,6 +89,25 @@ export function tabTitle(text: string): string {
   return isCopy ? `${base}${suffix}` : base;
 }
 
+const FILE_NAME_MAX = 60;
+
+/**
+ * Nome del file .md della nota: lo slug del titolo (minuscole, senza accenti, parole unite da
+ * "-", al massimo 60 caratteri). Le altre scritture restano; se non resta nulla, "nota".
+ */
+export function noteFileName(text: string): string {
+  const words = noteTitle(text)
+    .normalize('NFKD')
+    // Solo i diacritici combinanti di base: i segni di altre scritture (es. devanagari) restano.
+    .replace(/[̀-ͯ]/g, '')
+    .normalize('NFC')
+    .toLowerCase()
+    .split(/[^\p{L}\p{M}\p{N}]+/u)
+    .filter(Boolean);
+  const slug = Array.from(words.join('-')).slice(0, FILE_NAME_MAX).join('').replace(/-+$/, '');
+  return `${slug || 'nota'}.md`;
+}
+
 export function createNote(
   text: string,
   now: number = Date.now(),

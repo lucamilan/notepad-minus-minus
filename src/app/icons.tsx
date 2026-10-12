@@ -167,6 +167,16 @@ export function CopyIcon(props: IconProps) {
   );
 }
 
+/** Freccia verso il basso in un vassoio: "salva su file". */
+export function SaveFileIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8 2.5v7.5M5 7l3 3 3-3" />
+      <path d="M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2" />
+    </Icon>
+  );
+}
+
 /** "Chiudi le schede non fissate": una puntina che resta e una × per le altre. */
 export function CloseUnpinnedIcon(props: IconProps) {
   return (
